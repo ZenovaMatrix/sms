@@ -29,3 +29,4 @@ services:
         value: 1d
       - key: FRONTEND_URL
         sync: false
+
