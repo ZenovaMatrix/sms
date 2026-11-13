@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// Prioritize environment variable VITE_API_BASE_URL in production, fallback to '/api/v1' for local Vite proxy
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const baseURL = rawBaseUrl.endsWith('/api/v1') ? rawBaseUrl : (rawBaseUrl.replace(/\/+$/, '') + '/api/v1');
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   headers: { 'Content-Type': 'application/json' },
 });
 

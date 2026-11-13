@@ -2,7 +2,7 @@
 
 const pool = require("../../config/db");
 
-const SAFE_COLS = `c.id, c.class_name, c.description, c.created_at`;
+const SAFE_COLS = `c.id, c.class_name, c.description, c.status, c.created_at`;
 
 async function findAll({ page = 1, limit = 20, search = null }) {
   const offset = (page - 1) * limit;
@@ -23,7 +23,7 @@ async function findAll({ page = 1, limit = 20, search = null }) {
 
   const [rows] = await pool.execute(
     `SELECT
-       c.id, c.class_name, c.description, c.created_at,
+       c.id, c.class_name, c.description, c.status, c.created_at,
        COUNT(DISTINCT s.id) AS section_count,
        COALESCE(SUM(s.capacity), 0) AS total_capacity,
        COUNT(DISTINCT e.id) AS total_enrolled
@@ -31,7 +31,7 @@ async function findAll({ page = 1, limit = 20, search = null }) {
      LEFT JOIN sections s ON s.class_id = c.id
      LEFT JOIN enrollments e ON e.class_id = c.id AND e.status = 'active'
      ${whereSql}
-     GROUP BY c.id, c.class_name, c.description, c.created_at
+     GROUP BY c.id, c.class_name, c.description, c.status, c.created_at
      ORDER BY c.class_name ASC
      LIMIT ? OFFSET ?`,
     [...params, Number(limit), Number(offset)]
@@ -43,7 +43,7 @@ async function findAll({ page = 1, limit = 20, search = null }) {
 async function findById(id) {
   const [rows] = await pool.execute(
     `SELECT
-       c.id, c.class_name, c.description, c.created_at,
+       c.id, c.class_name, c.description, c.status, c.created_at,
        COUNT(DISTINCT s.id) AS section_count,
        COALESCE(SUM(s.capacity), 0) AS total_capacity,
        COUNT(DISTINCT e.id) AS total_enrolled
@@ -51,7 +51,7 @@ async function findById(id) {
      LEFT JOIN sections s ON s.class_id = c.id
      LEFT JOIN enrollments e ON e.class_id = c.id AND e.status = 'active'
      WHERE c.id = ?
-     GROUP BY c.id, c.class_name, c.description, c.created_at`,
+     GROUP BY c.id, c.class_name, c.description, c.status, c.created_at`,
     [id]
   );
   if (!rows[0]) return null;
@@ -60,7 +60,7 @@ async function findById(id) {
 
   const [sections] = await pool.execute(
     `SELECT
-       s.id, s.section_name, s.capacity,
+       s.id, s.section_name, s.capacity, s.status,
        (SELECT COUNT(*) FROM enrollments e WHERE e.section_id = s.id AND e.status = 'active') AS enrolled_count,
        (
          SELECT GROUP_CONCAT(DISTINCT CONCAT(t.first_name, ' ', t.last_name) SEPARATOR ', ')
@@ -74,7 +74,31 @@ async function findById(id) {
     [id]
   );
 
+  // Load subject assignments for the class
+  const [assignments] = await pool.execute(
+    `SELECT
+       ta.id AS assignment_id,
+       ta.subject_id,
+       sub.subject_name,
+       sub.subject_code,
+       ta.section_id,
+       sec.section_name,
+       ta.teacher_id,
+       CONCAT(t.first_name, ' ', t.last_name) AS teacher_name,
+       ta.academic_year_id,
+       ay.year_name
+     FROM teacher_assignments ta
+     JOIN subjects sub ON sub.id = ta.subject_id
+     JOIN sections sec ON sec.id = ta.section_id
+     JOIN teachers t ON t.id = ta.teacher_id
+     JOIN academic_years ay ON ay.id = ta.academic_year_id
+     WHERE ta.class_id = ?
+     ORDER BY sec.section_name ASC, sub.subject_name ASC`,
+    [id]
+  );
+
   cls.sections = sections || [];
+  cls.assignments = assignments || [];
   return cls;
 }
 
@@ -86,10 +110,10 @@ async function findByName(className) {
   return rows[0] || null;
 }
 
-async function create({ id, class_name, description }) {
+async function create({ id, class_name, description, status = "active" }) {
   await pool.execute(
-    `INSERT INTO classes (id, class_name, description) VALUES (?, ?, ?)`,
-    [id, class_name, description || null]
+    `INSERT INTO classes (id, class_name, description, status) VALUES (?, ?, ?, ?)`,
+    [id, class_name, description || null, status || "active"]
   );
   return findById(id);
 }

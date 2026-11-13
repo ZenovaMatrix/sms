@@ -473,7 +473,7 @@ async function getFinancialSummary({ academic_year_id = null, class_id = null, s
     params.push(class_id);
   }
   if (section_id) {
-    where.push("e.section_id = ?");
+    where.push("sf.student_id IN (SELECT student_id FROM enrollments WHERE section_id = ? AND status = 'active')");
     params.push(section_id);
   }
 
@@ -492,9 +492,6 @@ async function getFinancialSummary({ academic_year_id = null, class_id = null, s
        COUNT(*) AS total_records
      FROM student_fees sf
      JOIN fee_structures fs ON fs.id = sf.fee_structure_id
-     LEFT JOIN enrollments e ON e.student_id = sf.student_id
-       AND e.class_id = fs.class_id
-       AND e.academic_year_id = fs.academic_year_id
      ${whereSql}`,
     params
   );
@@ -510,6 +507,66 @@ async function getFinancialSummary({ academic_year_id = null, class_id = null, s
     overdueAmount: Number(summary.overdue_amount),
     totalRecords: Number(summary.total_records),
   };
+}
+
+async function bulkAssignToClass({ fee_structure_id, class_id, section_id = null, academic_year_id = null, amount_due }) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const enrollWhere = ["e.class_id = ?", "e.status = 'active'"];
+    const enrollParams = [class_id];
+
+    if (section_id) {
+      enrollWhere.push("e.section_id = ?");
+      enrollParams.push(section_id);
+    }
+    if (academic_year_id) {
+      enrollWhere.push("e.academic_year_id = ?");
+      enrollParams.push(academic_year_id);
+    }
+
+    const [enrolled] = await conn.execute(
+      `SELECT DISTINCT e.student_id
+       FROM enrollments e
+       WHERE ${enrollWhere.join(" AND ")}`,
+      enrollParams
+    );
+
+    let assignedCount = 0;
+    let skippedCount = 0;
+
+    for (const item of enrolled) {
+      const [existing] = await conn.execute(
+        `SELECT id FROM student_fees WHERE student_id = ? AND fee_structure_id = ?`,
+        [item.student_id, fee_structure_id]
+      );
+
+      if (existing.length > 0) {
+        skippedCount++;
+      } else {
+        const id = require("crypto").randomUUID();
+        await conn.execute(
+          `INSERT INTO student_fees (id, student_id, fee_structure_id, amount_due, amount_paid, balance, status)
+           VALUES (?, ?, ?, ?, 0.00, ?, 'unpaid')`,
+          [id, item.student_id, fee_structure_id, amount_due, amount_due]
+        );
+        assignedCount++;
+      }
+    }
+
+    await conn.commit();
+    return {
+      assignedCount,
+      skippedCount,
+      totalStudents: enrolled.length,
+    };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 module.exports = {
@@ -531,4 +588,5 @@ module.exports = {
   findPaymentById,
   recordPaymentTransaction,
   getFinancialSummary,
+  bulkAssignToClass,
 };

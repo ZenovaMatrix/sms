@@ -8,6 +8,7 @@ const SAFE_COLS = `
   c.class_name,
   s.section_name,
   s.capacity,
+  s.status,
   s.created_at
 `;
 
@@ -65,10 +66,10 @@ async function findByClassAndName(classId, sectionName) {
   return rows[0] || null;
 }
 
-async function create({ id, class_id, section_name, capacity }) {
+async function create({ id, class_id, section_name, capacity, status = "active" }) {
   await pool.execute(
-    `INSERT INTO sections (id, class_id, section_name, capacity) VALUES (?, ?, ?, ?)`,
-    [id, class_id, section_name, capacity !== undefined ? capacity : null]
+    `INSERT INTO sections (id, class_id, section_name, capacity, status) VALUES (?, ?, ?, ?, ?)`,
+    [id, class_id, section_name, capacity !== undefined ? capacity : null, status || "active"]
   );
   return findById(id);
 }

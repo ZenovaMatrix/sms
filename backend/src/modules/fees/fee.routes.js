@@ -6,6 +6,7 @@ const { authenticate } = require("../../middlewares/auth.middleware");
 const { authorize } = require("../../middlewares/role.middleware");
 
 const router = express.Router();
+
 // ─── FINANCIAL SUMMARY ────────────────────────────────────────────────────────
 router.get(
   "/summary",
@@ -56,14 +57,14 @@ router.delete(
 router.get(
   "/student-fees",
   authenticate,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "student", "parent"),
   ctrl.getAllStudentFees
 );
 
 router.get(
   "/student-fees/:id",
   authenticate,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "student", "parent"),
   ctrl.getStudentFeeById
 );
 
@@ -72,6 +73,13 @@ router.post(
   authenticate,
   authorize("admin"),
   ctrl.createStudentFee
+);
+
+router.post(
+  "/bulk-assign",
+  authenticate,
+  authorize("admin"),
+  ctrl.bulkAssignFees
 );
 
 router.patch(
@@ -93,14 +101,14 @@ router.delete(
 router.get(
   "/payments",
   authenticate,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "student", "parent"),
   ctrl.getAllPayments
 );
 
 router.get(
   "/payments/:id",
   authenticate,
-  authorize("admin", "teacher"),
+  authorize("admin", "teacher", "student", "parent"),
   ctrl.getPaymentById
 );
 

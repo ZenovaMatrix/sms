@@ -39,7 +39,7 @@ async function createAuditLog({
   return { id };
 }
 
-async function getAuditLogs({ entity_type, entity_id, user_id, limit = 50, page = 1 }) {
+async function getAuditLogs({ entity_type, entity_id, user_id, action = null, search = null, limit = 50, page = 1 }) {
   const offset = (page - 1) * limit;
   const where = [];
   const params = [];
@@ -55,6 +55,14 @@ async function getAuditLogs({ entity_type, entity_id, user_id, limit = 50, page 
   if (user_id) {
     where.push("user_id = ?");
     params.push(user_id);
+  }
+  if (action) {
+    where.push("action = ?");
+    params.push(action);
+  }
+  if (search) {
+    where.push("(user_name LIKE ? OR reason LIKE ? OR action LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";

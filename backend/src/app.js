@@ -27,6 +27,7 @@ const announcementRoutes = require("./modules/announcements/announcement.routes"
 const deadlineRoutes = require("./modules/deadlines/deadline.routes");
 const correctionRoutes = require("./modules/corrections/correction.routes");
 const auditRoutes = require("./modules/audit/audit.routes");
+const substituteRoutes = require("./modules/substitutes/substitute.routes");
 
 /**
  * app.js
@@ -37,10 +38,26 @@ const auditRoutes = require("./modules/audit/audit.routes");
 const app = express();
 
 // CORS middleware
+const config = require("./config/env");
+
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  const allowedOrigin = config.frontendUrl;
+
+  if (allowedOrigin === "*" || !origin) {
+    res.header("Access-Control-Allow-Origin", origin || "*");
+  } else {
+    const allowedList = allowedOrigin.split(",").map((s) => s.trim().replace(/\/$/, ""));
+    const normalizedOrigin = origin.replace(/\/$/, "");
+    if (allowedList.includes(normalizedOrigin) || allowedList.includes("*")) {
+      res.header("Access-Control-Allow-Origin", origin);
+    }
+  }
+
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  res.header("Access-Control-Allow-Credentials", "true");
+
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
@@ -77,6 +94,7 @@ app.use("/api/v1/announcements", announcementRoutes);
 app.use("/api/v1/deadlines", deadlineRoutes);
 app.use("/api/v1/correction-requests", correctionRoutes);
 app.use("/api/v1/audit-logs", auditRoutes);
+app.use("/api/v1/substitutes", substituteRoutes);
 
 // Global 404 Route Handler
 app.use((req, res) => {

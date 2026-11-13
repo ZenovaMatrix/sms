@@ -1,0 +1,25 @@
+# Logs & OS
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Build Artifacts
+dist/
+*/dist/
+build/
+*/build/
+
+# Temporary / Scratch
+scratch/
+*/scratch/
+

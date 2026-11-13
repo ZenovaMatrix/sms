@@ -9,8 +9,10 @@ async function getLogs(req, res, next) {
     const entity_type = req.query.entity_type || null;
     const entity_id = req.query.entity_id || null;
     const user_id = req.query.user_id || null;
+    const action = req.query.action || null;
+    const search = req.query.search || null;
 
-    const data = await auditRepo.getAuditLogs({ entity_type, entity_id, user_id, page, limit });
+    const data = await auditRepo.getAuditLogs({ entity_type, entity_id, user_id, action, search, page, limit });
     res.status(200).json({
       success: true,
       message: "Audit logs retrieved successfully.",

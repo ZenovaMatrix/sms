@@ -24,7 +24,7 @@ async function getFeeStructureById(req, res, next) {
 
 async function createFeeStructure(req, res, next) {
   try {
-    const result = await service.createFeeStructure(req.body);
+    const result = await service.createFeeStructure(req.body, req.user);
     res.status(201).json({ success: true, message: "Fee structure created successfully.", data: result });
   } catch (err) {
     next(err);
@@ -33,7 +33,7 @@ async function createFeeStructure(req, res, next) {
 
 async function patchFeeStructure(req, res, next) {
   try {
-    const result = await service.patchFeeStructure(req.params.id, req.body);
+    const result = await service.patchFeeStructure(req.params.id, req.body, req.user);
     res.status(200).json({ success: true, message: "Fee structure updated successfully.", data: result });
   } catch (err) {
     next(err);
@@ -42,7 +42,7 @@ async function patchFeeStructure(req, res, next) {
 
 async function removeFeeStructure(req, res, next) {
   try {
-    const result = await service.removeFeeStructure(req.params.id);
+    const result = await service.removeFeeStructure(req.params.id, req.user);
     res.status(200).json({ success: true, message: result.message, data: null });
   } catch (err) {
     next(err);
@@ -53,7 +53,7 @@ async function removeFeeStructure(req, res, next) {
 
 async function getAllStudentFees(req, res, next) {
   try {
-    const result = await service.getAllStudentFees(req.query);
+    const result = await service.getAllStudentFees(req.query, req.user);
     res.status(200).json({ success: true, message: "Student fees retrieved successfully.", data: result });
   } catch (err) {
     next(err);
@@ -62,7 +62,7 @@ async function getAllStudentFees(req, res, next) {
 
 async function getStudentFeeById(req, res, next) {
   try {
-    const result = await service.getStudentFeeById(req.params.id);
+    const result = await service.getStudentFeeById(req.params.id, req.user);
     res.status(200).json({ success: true, message: "Student fee retrieved successfully.", data: result });
   } catch (err) {
     next(err);
@@ -71,8 +71,17 @@ async function getStudentFeeById(req, res, next) {
 
 async function createStudentFee(req, res, next) {
   try {
-    const result = await service.createStudentFee(req.body);
+    const result = await service.createStudentFee(req.body, req.user);
     res.status(201).json({ success: true, message: "Student fee record created successfully.", data: result });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function bulkAssignFees(req, res, next) {
+  try {
+    const result = await service.bulkAssignToClass(req.body, req.user);
+    res.status(201).json({ success: true, message: "Fees assigned to class students successfully.", data: result });
   } catch (err) {
     next(err);
   }
@@ -80,7 +89,7 @@ async function createStudentFee(req, res, next) {
 
 async function patchStudentFee(req, res, next) {
   try {
-    const result = await service.patchStudentFee(req.params.id, req.body);
+    const result = await service.patchStudentFee(req.params.id, req.body, req.user);
     res.status(200).json({ success: true, message: "Student fee record updated successfully.", data: result });
   } catch (err) {
     next(err);
@@ -89,7 +98,7 @@ async function patchStudentFee(req, res, next) {
 
 async function removeStudentFee(req, res, next) {
   try {
-    const result = await service.removeStudentFee(req.params.id);
+    const result = await service.removeStudentFee(req.params.id, req.user);
     res.status(200).json({ success: true, message: result.message, data: null });
   } catch (err) {
     next(err);
@@ -100,7 +109,7 @@ async function removeStudentFee(req, res, next) {
 
 async function getAllPayments(req, res, next) {
   try {
-    const result = await service.getAllPayments(req.query);
+    const result = await service.getAllPayments(req.query, req.user);
     res.status(200).json({ success: true, message: "Payments retrieved successfully.", data: result });
   } catch (err) {
     next(err);
@@ -109,7 +118,7 @@ async function getAllPayments(req, res, next) {
 
 async function getPaymentById(req, res, next) {
   try {
-    const result = await service.getPaymentById(req.params.id);
+    const result = await service.getPaymentById(req.params.id, req.user);
     res.status(200).json({ success: true, message: "Payment retrieved successfully.", data: result });
   } catch (err) {
     next(err);
@@ -118,7 +127,7 @@ async function getPaymentById(req, res, next) {
 
 async function recordPayment(req, res, next) {
   try {
-    const result = await service.recordPayment(req.body);
+    const result = await service.recordPayment(req.body, req.user);
     res.status(201).json({ success: true, message: "Payment recorded successfully.", data: result });
   } catch (err) {
     next(err);
@@ -143,6 +152,7 @@ module.exports = {
   getAllStudentFees,
   getStudentFeeById,
   createStudentFee,
+  bulkAssignFees,
   patchStudentFee,
   removeStudentFee,
   getAllPayments,

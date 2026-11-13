@@ -27,7 +27,7 @@ function validateCreate(body) {
     throw err;
   }
 
-  const allowed = ["class_id", "section_name", "capacity"];
+  const allowed = ["class_id", "section_name", "capacity", "status"];
   for (const k of Object.keys(body)) {
     if (!allowed.includes(k)) {
       const err = new Error(`Unknown field: '${k}'`);
@@ -65,10 +65,22 @@ function validateCreate(body) {
     capacity = c;
   }
 
+  let status = "active";
+  if (body.status !== undefined && body.status !== null) {
+    const s = String(body.status).trim().toLowerCase();
+    if (!["active", "inactive"].includes(s)) {
+      const err = new Error("status must be either 'active' or 'inactive'.");
+      err.statusCode = 400;
+      throw err;
+    }
+    status = s;
+  }
+
   return {
     class_id: body.class_id.trim(),
     section_name: body.section_name.trim(),
     capacity,
+    status,
   };
 }
 
@@ -79,7 +91,7 @@ function validatePatch(body) {
     throw err;
   }
 
-  const allowed = ["class_id", "section_name", "capacity"];
+  const allowed = ["class_id", "section_name", "capacity", "status"];
   const keys = Object.keys(body);
   if (keys.length === 0) {
     const err = new Error("Request body cannot be empty.");
@@ -131,6 +143,15 @@ function validatePatch(body) {
     } else {
       updates.capacity = null;
     }
+  }
+
+  if (body.status !== undefined) {
+    if (typeof body.status !== "string" || !["active", "inactive"].includes(body.status.trim().toLowerCase())) {
+      const err = new Error("status must be either 'active' or 'inactive'.");
+      err.statusCode = 400;
+      throw err;
+    }
+    updates.status = body.status.trim().toLowerCase();
   }
 
   return updates;

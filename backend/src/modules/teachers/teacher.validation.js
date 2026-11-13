@@ -17,6 +17,7 @@ const ALLOWED_PATCH_FIELDS = new Set([
   "qualification",
   "joining_date",
   "status",
+  "department_id",
 ]);
 
 const FORBIDDEN_PATCH_FIELDS = new Set([
@@ -26,7 +27,6 @@ const FORBIDDEN_PATCH_FIELDS = new Set([
   "teacher_id",
   "email",
   "role",
-  "department_id",
   "created_at",
   "updated_at",
   "password_hash",
@@ -200,6 +200,19 @@ function validatePatchTeacherPayload(body) {
       }
     }
     updates.joining_date = body.joining_date || null;
+  }
+
+  if (body.department_id !== undefined) {
+    if (body.department_id === null || body.department_id === "") {
+      updates.department_id = null;
+    } else {
+      if (typeof body.department_id !== "string" || !UUID_REGEX.test(body.department_id.trim())) {
+        const err = new Error("department_id must be a valid UUID or null.");
+        err.statusCode = 400;
+        throw err;
+      }
+      updates.department_id = body.department_id.trim();
+    }
   }
 
   if (body.status !== undefined) {

@@ -1,7 +1,9 @@
 "use strict";
 
 const bcrypt = require("bcryptjs");
+const pool = require("../../config/db");
 const teacherRepository = require("./teacher.repository");
+const auditRepo = require("../audit/audit.repository");
 const {
   validateTeacherId,
   validateUserId,
@@ -111,6 +113,57 @@ async function updateTeacher(id, body, requester) {
   }
 
   const updated = await teacherRepository.updateTeacher(cleanId, updates);
+
+  // Synchronize linked user if name, phone, or status changed
+  if (existing.user_id) {
+    const userSets = [];
+    const userParams = [];
+
+    if (updates.first_name || updates.last_name) {
+      const newFirst = updates.first_name || existing.first_name;
+      const newLast = updates.last_name || existing.last_name;
+      userSets.push("`name` = ?");
+      userParams.push(`${newFirst} ${newLast}`);
+    }
+
+    if (updates.phone !== undefined) {
+      userSets.push("`phone` = ?");
+      userParams.push(updates.phone);
+    }
+
+    if (updates.status !== undefined) {
+      // If teacher is inactive, mark user inactive. If teacher is active, mark user active.
+      const userStatus = updates.status === "inactive" ? "inactive" : "active";
+      userSets.push("`status` = ?");
+      userParams.push(userStatus);
+    }
+
+    if (userSets.length > 0) {
+      userParams.push(existing.user_id);
+      await pool.execute(`UPDATE users SET ${userSets.join(", ")} WHERE id = ?`, userParams);
+    }
+  }
+
+  // Write audit log
+  await auditRepo.createAuditLog({
+    entity_type: "teacher",
+    entity_id: cleanId,
+    action: "UPDATE_TEACHER",
+    user_id: requester.userId || cleanId,
+    user_role: requester.role || "admin",
+    user_name: requester.userName || "System",
+    reason: body.reason || "Profile and assignment update",
+    old_values: {
+      first_name: existing.first_name,
+      last_name: existing.last_name,
+      phone: existing.phone,
+      department_id: existing.department_id,
+      qualification: existing.qualification,
+      status: existing.status,
+    },
+    new_values: updates,
+  });
+
   return updated;
 }
 
@@ -181,21 +234,65 @@ async function deleteTeacher(id, requester) {
     throw err;
   }
 
-  const pool = require("../../config/db");
+  // 1. Check teacher assignments
   const [assignments] = await pool.execute(
     `SELECT COUNT(*) AS cnt FROM teacher_assignments WHERE teacher_id = ?`,
     [cleanId]
   );
+  // 2. Check substitute assignments
+  const [subs] = await pool.execute(
+    `SELECT COUNT(*) AS cnt FROM substitute_assignments WHERE original_teacher_id = ? OR substitute_teacher_id = ?`,
+    [cleanId, cleanId]
+  );
+  // 3. Check correction requests
+  const [corrections] = await pool.execute(
+    `SELECT COUNT(*) AS cnt FROM correction_requests WHERE teacher_id = ?`,
+    [cleanId]
+  );
 
-  if (Number(assignments[0].cnt) > 0) {
+  const totalDeps = Number(assignments[0].cnt) + Number(subs[0].cnt) + Number(corrections[0].cnt);
+
+  if (totalDeps > 0) {
     await teacherRepository.updateTeacher(cleanId, { status: "inactive" });
+    if (teacher.user_id) {
+      await pool.execute(`UPDATE users SET status = 'inactive' WHERE id = ?`, [teacher.user_id]);
+    }
+
+    await auditRepo.createAuditLog({
+      entity_type: "teacher",
+      entity_id: cleanId,
+      action: "ARCHIVE_TEACHER",
+      user_id: requester.userId,
+      user_role: requester.role,
+      user_name: requester.userName || "Administrator",
+      reason: `Safe archival due to ${totalDeps} dependent records (${assignments[0].cnt} assignments, ${subs[0].cnt} substitutions, ${corrections[0].cnt} corrections).`,
+      old_values: { status: teacher.status },
+      new_values: { status: "inactive" },
+    });
+
     return {
       archived: true,
-      message: "Teacher has active assignments and was safely archived and deactivated.",
+      message: `Teacher has ${totalDeps} historical/active records and was safely archived and deactivated.`,
     };
   }
 
+  // Safe delete
   await teacherRepository.removeTeacher(cleanId);
+  if (teacher.user_id) {
+    await pool.execute(`DELETE FROM users WHERE id = ?`, [teacher.user_id]);
+  }
+
+  await auditRepo.createAuditLog({
+    entity_type: "teacher",
+    entity_id: cleanId,
+    action: "DELETE_TEACHER",
+    user_id: requester.userId,
+    user_role: requester.role,
+    user_name: requester.userName || "Administrator",
+    reason: "Safe deletion: zero dependencies found",
+    old_values: { employee_id: teacher.employee_id, name: `${teacher.first_name} ${teacher.last_name}` },
+  });
+
   return {
     deleted: true,
     message: "Teacher deleted successfully.",

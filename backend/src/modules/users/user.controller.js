@@ -79,6 +79,19 @@ async function updateUser(req, res, next) {
   }
 }
 
+async function updateUserRole(req, res, next) {
+  try {
+    const updatedUser = await userService.updateUserRole(req.params.id, req.body, req.user);
+    return res.status(200).json({
+      success: true,
+      message: "User role updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 /**
  * DELETE /api/v1/users/:id
  * Intentionally disabled to preserve data integrity and foreign keys.
@@ -97,5 +110,6 @@ module.exports = {
   getUserByEmail,
   createUser,
   updateUser,
+  updateUserRole,
   deleteUser,
 };

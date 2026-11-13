@@ -44,7 +44,12 @@ const config = Object.freeze({
     // Password is read directly — never logged or exposed
     password: process.env.DB_PASSWORD,
     name: process.env.DB_NAME,
+    ssl: process.env.DB_SSL === "true" || process.env.DB_PORT === "4000" ? {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false",
+    } : false,
   },
+  frontendUrl: process.env.FRONTEND_URL || "*",
 
   jwt: {
     // Secret is read directly — never logged or exposed

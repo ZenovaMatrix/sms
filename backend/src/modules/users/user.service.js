@@ -2,7 +2,9 @@
 
 const { randomUUID } = require("crypto");
 const bcrypt = require("bcryptjs");
+const pool = require("../../config/db");
 const userRepository = require("./user.repository");
+const auditRepo = require("../audit/audit.repository");
 const {
   validatePaginationParams,
   validateRole,
@@ -135,10 +137,58 @@ async function createUser(body) {
   return newUser;
 }
 
+async function updateUserRole(id, body, requester) {
+  if (requester.role !== "admin") {
+    const error = new Error("Forbidden: only administrators can change user roles.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (!id || typeof id !== "string") {
+    const error = new Error("User ID is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanId = id.trim();
+  const existingUser = await userRepository.findUserById(cleanId);
+  if (!existingUser) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const validRoles = ["admin", "teacher", "student", "parent", "librarian"];
+  const newRole = body.role ? String(body.role).trim().toLowerCase() : null;
+  if (!newRole || !validRoles.includes(newRole)) {
+    const error = new Error(`role must be one of: ${validRoles.join(", ")}`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  await pool.execute(`UPDATE users SET role = ? WHERE id = ?`, [newRole, cleanId]);
+  const updatedUser = await userRepository.findUserById(cleanId);
+
+  await auditRepo.createAuditLog({
+    entity_type: "user_permission",
+    entity_id: cleanId,
+    action: "UPDATE_USER_ROLE",
+    user_id: requester.userId,
+    user_role: requester.role,
+    user_name: requester.userName || "Administrator",
+    reason: body.reason || `Changed role from '${existingUser.role}' to '${newRole}'`,
+    old_values: { role: existingUser.role },
+    new_values: { role: newRole },
+  });
+
+  return updatedUser;
+}
+
 module.exports = {
   getUsers,
   getUserById,
   getUserByEmail,
   updateUser,
+  updateUserRole,
   createUser,
 };

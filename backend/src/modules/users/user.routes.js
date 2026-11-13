@@ -28,6 +28,9 @@ router.post("/", authenticate, authorize("admin"), userController.createUser);
 // PATCH /api/v1/users/:id
 router.patch("/:id", userController.updateUser);
 
+// PATCH /api/v1/users/:id/role (Admin-only role change with audit log)
+router.patch("/:id/role", authenticate, authorize("admin"), userController.updateUserRole);
+
 // DELETE /api/v1/users/:id (Disabled in Phase 3A -> 501)
 router.delete("/:id", userController.deleteUser);
 

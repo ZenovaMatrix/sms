@@ -11,7 +11,7 @@ const config = require("./env");
  * rather than creating new connections per request.
  */
 
-const pool = mysql.createPool({
+const poolConfig = {
   host: config.db.host,
   port: config.db.port,
   user: config.db.user,
@@ -20,6 +20,12 @@ const pool = mysql.createPool({
   connectionLimit: 10,
   waitForConnections: true,
   queueLimit: 0,
-});
+};
+
+if (config.db.ssl) {
+  poolConfig.ssl = config.db.ssl;
+}
+
+const pool = mysql.createPool(poolConfig);
 
 module.exports = pool;
