@@ -19,6 +19,14 @@
       "dest": "backend/api/index.js"
     },
     {
+      "src": "/assets/(.*)",
+      "dest": "frontend/assets/$1"
+    },
+    {
+      "src": "/(favicon\\.svg|icons\\.svg|vite\\.svg|robots\\.txt)",
+      "dest": "frontend/$1"
+    },
+    {
       "handle": "filesystem"
     },
     {
@@ -27,4 +35,3 @@
     }
   ]
 }
-
