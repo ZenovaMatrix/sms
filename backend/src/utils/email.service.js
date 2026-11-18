@@ -11,12 +11,29 @@
  */
 
 function createMailTransporter() {
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  const cleanUser = (
+    process.env.SMTP_USER ||
+    process.env.SMTP_USERNAME ||
+    process.env.GMAIL_USER ||
+    process.env.EMAIL_USER ||
+    ""
+  ).trim();
+
+  const cleanPass = (
+    process.env.SMTP_PASS ||
+    process.env.SMTP_PASSWORD ||
+    process.env.GMAIL_APP_PASSWORD ||
+    process.env.GMAIL_PASS ||
+    process.env.EMAIL_PASS ||
+    ""
+  ).replace(/\s+/g, "");
+
+  if (!cleanUser || !cleanPass) {
+    console.warn(
+      `[EmailService] Missing credentials in environment — User: ${cleanUser ? "SET" : "MISSING"}, Pass: ${cleanPass ? "SET" : "MISSING"}`
+    );
     return null;
   }
-
-  const cleanUser = process.env.SMTP_USER.trim();
-  const cleanPass = process.env.SMTP_PASS.replace(/\s+/g, "");
 
   const nodemailer = require("nodemailer");
   const host = (process.env.SMTP_HOST || "smtp.gmail.com").toLowerCase();
@@ -96,8 +113,16 @@ async function sendOtpEmail({ to, name, otp }) {
 
     if (transporter) {
       try {
+        const senderUser = (
+          process.env.SMTP_USER ||
+          process.env.SMTP_USERNAME ||
+          process.env.GMAIL_USER ||
+          process.env.EMAIL_USER ||
+          ""
+        ).trim();
+
         await transporter.sendMail({
-          from: process.env.SMTP_FROM || `"EduManage Security" <${process.env.SMTP_USER}>`,
+          from: process.env.SMTP_FROM || `"EduManage Security" <${senderUser}>`,
           to,
           subject,
           text: bodyText,
@@ -236,8 +261,16 @@ async function sendAccountActivationEmail({ to, name, role, password, isResend =
   const transporter = createMailTransporter();
   if (transporter) {
     try {
+      const senderUser = (
+        process.env.SMTP_USER ||
+        process.env.SMTP_USERNAME ||
+        process.env.GMAIL_USER ||
+        process.env.EMAIL_USER ||
+        ""
+      ).trim();
+
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || `"EduManage Institution Management" <${process.env.SMTP_USER}>`,
+        from: process.env.SMTP_FROM || `"EduManage Institution Management" <${senderUser}>`,
         to,
         subject,
         text: bodyText,

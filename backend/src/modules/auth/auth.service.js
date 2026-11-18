@@ -158,6 +158,7 @@ async function login(payload) {
       email: maskedEmail,
       emailSent: emailStatus.sent,
       smtpConfigured: emailStatus.configured,
+      deliveryReason: emailStatus.reason || undefined,
       message,
       demoOtp: isDemoAdmin ? otp : undefined,
     };
@@ -357,6 +358,7 @@ async function resendAdminOtp(payload) {
     tempToken: newTempToken,
     emailSent: emailStatus.sent,
     smtpConfigured: emailStatus.configured,
+    deliveryReason: emailStatus.reason || undefined,
     message,
     demoOtp: isDemoAdmin ? otp : undefined,
   };
