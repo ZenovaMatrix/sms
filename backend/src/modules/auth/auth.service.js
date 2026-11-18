@@ -12,6 +12,9 @@ const {
 } = require("./auth.validation");
 const { generateToken, verifyToken } = require("../../utils/jwt");
 const { sendOtpEmail } = require("../../utils/email.service");
+const otpCache = require("../../utils/otp-cache");
+
+const DEMO_ADMIN_EMAIL = (process.env.DEMO_ADMIN_EMAIL || "demo@edumanage.com").toLowerCase();
 
 /**
  * auth.service.js
@@ -27,7 +30,7 @@ function generateSecureOtp() {
 
 async function login(payload) {
   // 1. Validate payload structure and types
-  const { email, password } = validateLoginPayload(payload);
+  const { email, password, selectedRole } = validateLoginPayload(payload);
 
   // 2. Lookup user by email
   const user = await authRepository.findUserForAuth(email);
@@ -70,7 +73,36 @@ async function login(payload) {
     throw error;
   }
 
-  // 5. ADMIN 2FA OTP REQUIREMENT
+  // 5. ROLE VALIDATION & PORTAL ACCESS CHECK
+  if (selectedRole) {
+    const normalizedSelected = selectedRole.toLowerCase();
+    const roleMap = {
+      admin: "admin",
+      teacher: "teacher",
+      faculty: "teacher",
+      student: "student",
+      parent: "parent",
+      librarian: "librarian",
+    };
+    const expectedDbRole = roleMap[normalizedSelected] || normalizedSelected;
+
+    if (user.role !== expectedDbRole) {
+      const portalNames = {
+        admin: "Admin",
+        teacher: "Faculty",
+        faculty: "Faculty",
+        student: "Student",
+        parent: "Parent",
+        librarian: "Librarian",
+      };
+      const requestedPortal = portalNames[normalizedSelected] || selectedRole;
+      const error = new Error(`Access denied: You do not have permission to access the ${requestedPortal} Portal.`);
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
+  // 6. ADMIN 2FA OTP REQUIREMENT
   // If the user has role 'admin', issue a temporary token and dispatch an OTP to their email
   if (user.role === "admin") {
     const otp = generateSecureOtp();
@@ -92,6 +124,12 @@ async function login(payload) {
       name: user.name,
       otp,
     });
+
+    // For the demo admin account: cache the plaintext OTP so the
+    // /auth/demo-otp-peek endpoint can surface it for demonstrations.
+    if (user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
+      otpCache.set(user.id, otp);
+    }
 
     // Issue a short-lived temp token (valid for 5 mins) exclusively for verifying OTP
     const tempToken = generateToken({
@@ -187,8 +225,9 @@ async function verifyAdminOtp(payload) {
     throw error;
   }
 
-  // 6. OTP is verified! Clean up OTP record
+  // 6. OTP is verified! Clean up OTP record and purge cache
   await authRepository.deleteAdminOtp(otpRecord.id);
+  otpCache.del(decoded.userId); // purge demo cache entry if present
 
   // 7. Load fresh user record
   const user = await authRepository.findUserById(decoded.userId);
@@ -275,6 +314,11 @@ async function resendAdminOtp(payload) {
     otp,
   });
 
+  // Update demo cache on resend
+  if (user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
+    otpCache.set(user.id, otp);
+  }
+
   // Issue refreshed temp token
   const newTempToken = generateToken({
     userId: user.id,
@@ -292,8 +336,53 @@ async function resendAdminOtp(payload) {
   };
 }
 
+async function getDemoOtp(payload) {
+  const { tempToken, peekSecret } = payload || {};
+
+  // Validate peek secret
+  const configuredSecret = process.env.DEMO_PEEK_SECRET || "EduManage-Demo-2026";
+  if (!peekSecret || peekSecret !== configuredSecret) {
+    const error = new Error("Invalid demo peek secret.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  // Validate temp token
+  let decoded;
+  try {
+    decoded = verifyToken(tempToken);
+  } catch {
+    const error = new Error("Invalid or expired session. Please initiate demo login again.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  if (decoded.role !== "admin_pending_2fa" || decoded.type !== "admin_otp_session") {
+    const error = new Error("This endpoint is only valid during admin OTP verification.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Only for demo admin
+  const user = await authRepository.findUserById(decoded.userId);
+  if (!user || user.email.toLowerCase() !== DEMO_ADMIN_EMAIL) {
+    const error = new Error("Demo OTP peek is only available for the designated demo account.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const otp = otpCache.get(user.id);
+  if (!otp) {
+    const error = new Error("Demo OTP has expired or was already used. Please initiate login again.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return { otp };
+}
+
 async function register(payload) {
-  const { name, email, password } = validateRegisterPayload(payload);
+  const { name, email, password, role } = validateRegisterPayload(payload);
 
   // Check if email already exists
   const existing = await authRepository.findUserForAuth(email);
@@ -307,13 +396,13 @@ async function register(payload) {
   const password_hash = await bcrypt.hash(password, 10);
   const id = crypto.randomUUID();
 
-  // Create user (default role is student for public signups, or can be assigned by admin)
+  // Create user with validated self-registration role (student or parent)
   const newUser = await userRepository.createUser({
     id,
     name,
     email,
     password_hash,
-    role: "student",
+    role: role || "student",
     phone: null,
     status: "active",
   });
@@ -341,5 +430,6 @@ module.exports = {
   login,
   verifyAdminOtp,
   resendAdminOtp,
+  getDemoOtp,
   register,
 };

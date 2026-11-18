@@ -34,6 +34,9 @@ router.post("/verify-otp", authController.verifyOtp);
 // POST /api/v1/auth/resend-otp  — public (requires tempToken)
 router.post("/resend-otp", authController.resendOtp);
 
+// POST /api/v1/auth/demo-otp-peek  — demo only (requires tempToken + peekSecret)
+router.post("/demo-otp-peek", authController.getDemoOtp);
+
 // POST /api/v1/auth/register  — public
 router.post("/register", authController.register);
 

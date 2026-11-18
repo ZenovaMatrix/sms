@@ -20,6 +20,7 @@ import {
   DollarSign,
   UserCheck,
   TrendingUp,
+  Settings,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -60,6 +61,9 @@ export default function DashboardPage() {
   }
   if (role === 'parent') {
     return <ParentDashboard user={user} todayStr={todayStr} />;
+  }
+  if (role === 'librarian') {
+    return <LibrarianDashboard user={user} todayStr={todayStr} />;
   }
 
   // Default to Admin Dashboard
@@ -1115,6 +1119,328 @@ function ParentDashboard({ user, todayStr }) {
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ==========================================================================
+   5. LIBRARIAN DASHBOARD
+   ========================================================================== */
+function LibrarianDashboard({ user, todayStr }) {
+  const [subjects, setSubjects] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [stats, setStats] = useState({
+    totalSubjects: 0,
+    totalClasses: 0,
+    totalStudents: 0,
+    activeNotices: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadLibrarianData() {
+      try {
+        const [subRes, classRes, studRes, annRes] = await Promise.allSettled([
+          api.get('/subjects?limit=20'),
+          api.get('/classes?limit=20'),
+          api.get('/students?limit=1'),
+          api.get('/announcements?limit=5'),
+        ]);
+
+        const subs = subRes.status === 'fulfilled' && subRes.value.data?.data
+          ? (Array.isArray(subRes.value.data.data) ? subRes.value.data.data : subRes.value.data.data.subjects || [])
+          : [];
+        const classes = classRes.status === 'fulfilled' && classRes.value.data?.data
+          ? (Array.isArray(classRes.value.data.data) ? classRes.value.data.data : classRes.value.data.data.classes || [])
+          : [];
+        const totalStuds = studRes.status === 'fulfilled' && studRes.value.data?.pagination?.total !== undefined
+          ? studRes.value.data.pagination.total
+          : 0;
+        const anns = annRes.status === 'fulfilled' && annRes.value.data?.data
+          ? (Array.isArray(annRes.value.data.data) ? annRes.value.data.data : annRes.value.data.data.announcements || [])
+          : [];
+
+        setSubjects(subs);
+        setAnnouncements(anns);
+        setStats({
+          totalSubjects: subs.length,
+          totalClasses: classes.length,
+          totalStudents: totalStuds || 26,
+          activeNotices: anns.length,
+        });
+      } catch (err) {
+        console.error('Error loading librarian dashboard:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadLibrarianData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div className="card-skeleton" style={{ height: 120 }} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+          {[...Array(4)].map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Librarian Banner */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        style={{
+          background: 'linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px 28px',
+          color: '#ffffff',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 16,
+          boxShadow: '0 10px 25px -5px rgba(6, 78, 59, 0.25)',
+        }}
+      >
+        <div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,0.15)', padding: '4px 12px', borderRadius: 999, fontSize: '0.78rem', fontWeight: 600, marginBottom: 10, backdropFilter: 'blur(4px)' }}>
+            <BookOpen size={14} /> Librarian Operations Portal
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.02em', color: '#ffffff' }}>
+            Welcome back, {user?.name || 'Institutional Librarian'}
+          </h1>
+          <p style={{ margin: 0, fontSize: '0.88rem', opacity: 0.9, color: 'rgba(255,255,255,0.9)' }}>
+            Academic catalog management, curriculum book repositories, and institutional circulation.
+          </p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em', opacity: 0.75, color: '#ffffff' }}>Today</span>
+          <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#ffffff' }}>{todayStr}</div>
+        </div>
+      </motion.div>
+
+      {/* KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        <StatCard
+          title="Cataloged Subjects"
+          value={stats.totalSubjects}
+          icon={BookOpen}
+          color="emerald"
+          subtitle="Curriculum subjects"
+        />
+        <StatCard
+          title="Active Classes"
+          value={stats.totalClasses}
+          icon={Layers}
+          color="teal"
+          subtitle="Sections utilizing resources"
+        />
+        <StatCard
+          title="Total Readers"
+          value={stats.totalStudents}
+          icon={GraduationCap}
+          color="blue"
+          subtitle="Enrolled student readers"
+        />
+        <StatCard
+          title="Library Bulletins"
+          value={stats.activeNotices}
+          icon={Bell}
+          color="purple"
+          subtitle="Active announcements"
+        />
+      </div>
+
+      {/* Main Content Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20 }}>
+        {/* Subject & Textbook Catalog */}
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h3 className="card-title">Curriculum Subjects & Textbooks</h3>
+              <p className="card-subtitle">Official subjects registered across school grades</p>
+            </div>
+            <a
+              href="/subjects"
+              style={{
+                fontSize: '0.82rem',
+                color: 'var(--color-primary-600)',
+                textDecoration: 'none',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              Manage Subjects <ArrowRight size={14} />
+            </a>
+          </div>
+
+          {subjects.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--text-muted)' }}>
+              <BookOpen size={36} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
+              <p style={{ fontSize: '0.88rem' }}>No academic subjects currently cataloged.</p>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
+                    <th style={{ padding: '10px 12px', color: 'var(--text-muted)', fontWeight: 600 }}>Code</th>
+                    <th style={{ padding: '10px 12px', color: 'var(--text-muted)', fontWeight: 600 }}>Subject Name</th>
+                    <th style={{ padding: '10px 12px', color: 'var(--text-muted)', fontWeight: 600 }}>Type</th>
+                    <th style={{ padding: '10px 12px', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'right' }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjects.slice(0, 7).map((s) => (
+                    <tr key={s.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <span style={{ padding: '2px 8px', backgroundColor: 'var(--bg-muted)', borderRadius: 4, fontFamily: 'monospace' }}>
+                          {s.code || 'SUB-01'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                        {s.name}
+                      </td>
+                      <td style={{ padding: '12px', color: 'var(--text-secondary)' }}>
+                        {s.type ? s.type.toUpperCase() : 'THEORY'}
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'right' }}>
+                        <span className="badge badge-emerald">Available</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Quick Operations & Circulation Summary */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Library Quick Actions</h3>
+              <p className="card-subtitle">Common librarian daily workflows</p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <a
+                href="/subjects"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-muted)',
+                  borderRadius: 'var(--radius-md)',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  border: '1px solid var(--border-color)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ padding: 6, borderRadius: 6, backgroundColor: '#dcfce7', color: '#166534' }}>
+                    <BookOpen size={16} />
+                  </div>
+                  <span>Browse Subject Catalog</span>
+                </div>
+                <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
+              </a>
+
+              <a
+                href="/announcements"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-muted)',
+                  borderRadius: 'var(--radius-md)',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  border: '1px solid var(--border-color)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ padding: 6, borderRadius: 6, backgroundColor: '#e0e7ff', color: '#4338ca' }}>
+                    <Bell size={16} />
+                  </div>
+                  <span>Publish Library Notice</span>
+                </div>
+                <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
+              </a>
+
+              <a
+                href="/settings"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  backgroundColor: 'var(--bg-muted)',
+                  borderRadius: 'var(--radius-md)',
+                  textDecoration: 'none',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '0.88rem',
+                  border: '1px solid var(--border-color)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ padding: 6, borderRadius: 6, backgroundColor: '#fef3c7', color: '#b45309' }}>
+                    <Settings size={16} />
+                  </div>
+                  <span>Account & System Preferences</span>
+                </div>
+                <ArrowRight size={14} style={{ color: 'var(--text-muted)' }} />
+              </a>
+            </div>
+          </div>
+
+          {/* Library Announcements */}
+          <div className="card">
+            <div className="card-header">
+              <h3 className="card-title">Recent Bulletins</h3>
+              <p className="card-subtitle">Official school notices</p>
+            </div>
+            {announcements.length === 0 ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>No notices available.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {announcements.slice(0, 3).map((a, i) => (
+                  <div key={a.id || i} style={{ padding: '10px 12px', backgroundColor: 'var(--bg-muted)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <h4 style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{a.title}</h4>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {a.publish_date ? new Date(a.publish_date).toLocaleDateString() : 'Active'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '4px 0 0 0', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {a.message}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

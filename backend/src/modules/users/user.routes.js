@@ -25,8 +25,14 @@ router.get("/:id", userController.getUserById);
 // POST /api/v1/users (Admin-only user creation)
 router.post("/", authenticate, authorize("admin"), userController.createUser);
 
-// PATCH /api/v1/users/:id
-router.patch("/:id", userController.updateUser);
+// POST /api/v1/users/:id/resend-invite (Admin-only resend invitation/activation email)
+router.post("/:id/resend-invite", authenticate, authorize("admin"), userController.resendInvitation);
+
+// PATCH /api/v1/users/:id/status (Admin-only toggle status)
+router.patch("/:id/status", authenticate, authorize("admin"), userController.toggleUserStatus);
+
+// PATCH /api/v1/users/:id (Admin-only user update)
+router.patch("/:id", authenticate, authorize("admin"), userController.updateUser);
 
 // PATCH /api/v1/users/:id/role (Admin-only role change with audit log)
 router.patch("/:id/role", authenticate, authorize("admin"), userController.updateUserRole);

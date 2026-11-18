@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
@@ -16,13 +16,80 @@ import {
   ArrowLeft,
   AlertCircle,
   Check,
+  Users,
+  GraduationCap,
+  UserCheck,
+  BookOpen,
+  Info,
+  Building2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/api';
 
+const PORTAL_ROLES = [
+  {
+    id: 'admin',
+    name: 'Admin Portal',
+    shortName: 'Admin',
+    tagline: 'Institution Governance',
+    description: 'Institution-wide control, security policies, and administrative operations.',
+    icon: ShieldCheck,
+    badge: 'Dual-Factor 2FA',
+    color: '#065f46',
+    bgLight: '#dcfce7',
+  },
+  {
+    id: 'faculty',
+    name: 'Faculty Portal',
+    shortName: 'Faculty',
+    tagline: 'Classes & Grading',
+    description: 'Manage assigned classes, student attendance, exams, and academic gradebooks.',
+    icon: Users,
+    badge: 'Direct Access',
+    color: '#1e40af',
+    bgLight: '#dbeafe',
+  },
+  {
+    id: 'student',
+    name: 'Student Portal',
+    shortName: 'Student',
+    tagline: 'Courses & Results',
+    description: 'Access academic curriculum, attendance reports, exam schedules, and term grades.',
+    icon: GraduationCap,
+    badge: 'Direct Access',
+    color: '#047857',
+    bgLight: '#d1fae5',
+  },
+  {
+    id: 'parent',
+    name: 'Parent Portal',
+    shortName: 'Parent',
+    tagline: 'Progress & Fees',
+    description: "Monitor children's attendance ratios, exam scorecards, and tuition fee schedules.",
+    icon: UserCheck,
+    badge: 'Family Access',
+    color: '#b45309',
+    bgLight: '#fef3c7',
+  },
+  {
+    id: 'librarian',
+    name: 'Librarian Portal',
+    shortName: 'Librarian',
+    tagline: 'Catalog & Books',
+    description: 'Manage curriculum textbooks, academic subject repositories, and book circulation.',
+    icon: BookOpen,
+    badge: 'Direct Access',
+    color: '#7c3aed',
+    bgLight: '#ede9fe',
+  },
+];
+
 export default function LoginPage() {
   // Navigation mode: 'login' | 'signup' | 'admin-otp'
   const [mode, setMode] = useState('login');
+
+  // Selected Role for Login (defaults to 'admin')
+  const [selectedRole, setSelectedRole] = useState('admin');
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -30,6 +97,7 @@ export default function LoginPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Sign Up form state
+  const [signupRole, setSignupRole] = useState('student');
   const [signupName, setSignupName] = useState('');
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
@@ -49,9 +117,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [fetchingDemoOtp, setFetchingDemoOtp] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // Currently active role object
+  const currentRole = PORTAL_ROLES.find((r) => r.id === selectedRole) || PORTAL_ROLES[0];
 
   // OTP Countdown Timer
   useEffect(() => {
@@ -80,6 +152,13 @@ export default function LoginPage() {
     setSuccessMessage('');
   }
 
+  // Handle Role Selection
+  function handleSelectRole(roleId) {
+    setSelectedRole(roleId);
+    setError('');
+    setSuccessMessage('');
+  }
+
   // Handle Standard Login
   async function handleLoginSubmit(e) {
     e.preventDefault();
@@ -91,6 +170,7 @@ export default function LoginPage() {
       const { data } = await api.post('/auth/login', {
         email: loginEmail,
         password: loginPassword,
+        selectedRole: selectedRole,
       });
 
       if (data.success) {
@@ -104,14 +184,17 @@ export default function LoginPage() {
           setMode('admin-otp');
           setSuccessMessage(data.data.message || 'Verification code sent to registered admin email.');
         } else {
-          // Standard login for students, teachers, parents, librarians
+          // Standard direct login for verified role
           const { token, user } = data.data;
           login(user, token);
           navigate('/', { replace: true });
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please verify your credentials.');
+      setError(
+        err.response?.data?.message ||
+          'Authentication failed. Please verify your credentials and selected portal.'
+      );
     } finally {
       setLoading(false);
     }
@@ -175,11 +258,37 @@ export default function LoginPage() {
     }
   }
 
+  // Handle Demo OTP Auto-fill
+  async function handleFetchDemoOtp() {
+    setFetchingDemoOtp(true);
+    setError('');
+    try {
+      const { data } = await api.post('/auth/demo-otp-peek', {
+        tempToken: adminTempToken,
+        peekSecret: 'EduManage-Demo-2026',
+      });
+      if (data.success && data.data?.otp) {
+        const digits = data.data.otp.split('');
+        setOtpDigits(digits);
+        setSuccessMessage(`Demo OTP code (${data.data.otp}) populated! Click "Verify & Continue".`);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not auto-retrieve demo OTP.');
+    } finally {
+      setFetchingDemoOtp(false);
+    }
+  }
+
   // Handle Sign Up
   async function handleSignupSubmit(e) {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
+
+    if (signupRole !== 'student' && signupRole !== 'parent') {
+      setError('Faculty, Librarian, and Administrator accounts must be created by institution management.');
+      return;
+    }
 
     if (signupPassword !== signupConfirmPassword) {
       setError('Passwords do not match. Please verify your entries.');
@@ -198,6 +307,7 @@ export default function LoginPage() {
         name: signupName,
         email: signupEmail,
         password: signupPassword,
+        role: signupRole,
       });
 
       if (data.success) {
@@ -217,7 +327,6 @@ export default function LoginPage() {
     if (!/^\d*$/.test(value)) return;
 
     const newDigits = [...otpDigits];
-    // Handle paste of 6 digits
     if (value.length > 1) {
       const pasted = value.slice(0, 6).split('');
       for (let i = 0; i < 6; i++) {
@@ -257,22 +366,24 @@ export default function LoginPage() {
       style={{
         minHeight: '100vh',
         display: 'grid',
-        gridTemplateColumns: '1.1fr 0.9fr',
+        gridTemplateColumns: '1.05fr 0.95fr',
         backgroundColor: 'var(--bg-app)',
       }}
+      className="login-container"
     >
-      {/* Left Brand Panel */}
+      {/* ─── LEFT BRAND PANEL ───────────────────────────────────────────── */}
       <div
         style={{
           background: 'linear-gradient(145deg, #14532d 0%, #166534 50%, #064e3b 100%)',
           color: '#ffffff',
-          padding: '60px 80px',
+          padding: '48px 64px',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
           position: 'relative',
           overflow: 'hidden',
         }}
+        className="brand-panel"
       >
         {/* Subtle decorative circles */}
         <div
@@ -319,17 +430,17 @@ export default function LoginPage() {
             <ShieldCheck size={28} />
           </div>
           <div>
-            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em' }}>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', margin: 0 }}>
               EduManage
             </h3>
             <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.08em', color: '#86efac', fontWeight: 600 }}>
-              Institutional SaaS Platform
+              Multi-Role Educational Platform
             </span>
           </div>
         </div>
 
         {/* Brand Value Proposition */}
-        <div style={{ margin: '40px 0', maxWidth: 520 }}>
+        <div style={{ margin: '36px 0', maxWidth: 540 }}>
           <div
             style={{
               display: 'inline-flex',
@@ -341,53 +452,109 @@ export default function LoginPage() {
               fontSize: '0.8rem',
               fontWeight: 600,
               color: '#bbf7d0',
-              marginBottom: 20,
+              marginBottom: 18,
             }}
           >
-            <Sparkles size={14} /> Multi-Role Campus Architecture
+            <Sparkles size={14} /> Unified Multi-Role Authentication
           </div>
 
-          <h1 style={{ fontSize: '2.5rem', fontWeight: 800, lineHeight: 1.2, color: '#ffffff', marginBottom: 18 }}>
-            Enterprise security for modern educational institutions.
+          <h1 style={{ fontSize: '2.4rem', fontWeight: 800, lineHeight: 1.22, color: '#ffffff', marginBottom: 16 }}>
+            Dedicated portals tailored for every campus stakeholder.
           </h1>
 
-          <p style={{ color: '#dcfce7', fontSize: '0.98rem', lineHeight: 1.6, opacity: 0.9 }}>
-            Connecting administrators, educators, students, and parents with dual-factor authentication, verified gradebooks, and instant campus communications.
+          <p style={{ color: '#dcfce7', fontSize: '0.94rem', lineHeight: 1.6, opacity: 0.9 }}>
+            Seamlessly switch between institutional governance, faculty classrooms, student learning suites, family progress trackers, and library circulation desks.
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 36 }}>
-            {[
-              'Hardware-grade Admin 2FA One-Time Passcode (OTP)',
-              'Granular Role Enforcement (Admin, Faculty, Student, Parent)',
-              'Live Biometric & Class Attendance Records',
-              'Automated Ledger Invoicing with Real-Time Receipts',
-            ].map((feat, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '0.88rem', color: '#f0fdf4' }}>
-                <CheckCircle size={18} color="#4ade80" />
-                <span>{feat}</span>
-              </div>
-            ))}
+          {/* Interactive Role Highlights */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, marginTop: 28 }}>
+            {PORTAL_ROLES.map((r) => {
+              const IconComp = r.icon;
+              const isSelected = selectedRole === r.id;
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => handleSelectRole(r.id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+                    backdropFilter: 'blur(4px)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    border: isSelected ? '1px solid #86efac' : '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      backgroundColor: isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.15)',
+                      color: isSelected ? '#166534' : '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <IconComp size={18} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.86rem', fontWeight: 700, color: '#ffffff' }}>{r.name}</span>
+                      <span
+                        style={{
+                          fontSize: '0.68rem',
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          backgroundColor: isSelected ? '#bbf7d0' : 'rgba(255, 255, 255, 0.15)',
+                          color: isSelected ? '#14532d' : '#e2e8f0',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {r.badge}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: '0.74rem', color: '#dcfce7', opacity: 0.85, display: 'block' }}>
+                      {r.tagline}
+                    </span>
+                  </div>
+                  {isSelected && <Check size={16} style={{ color: '#86efac' }} />}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Footer */}
-        <div style={{ fontSize: '0.76rem', color: '#86efac', opacity: 0.85 }}>
-          © 2026 EduManage Technologies Inc. Strict TLS 1.3 & 2FA Enforced.
+        {/* Brand Footer */}
+        <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.15)', paddingTop: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.76rem', color: 'rgba(255, 255, 255, 0.75)' }}>
+            © {new Date().getFullYear()} EduManage Enterprise
+          </span>
+          <span style={{ fontSize: '0.76rem', color: '#86efac', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block' }} />
+            TiDB Cloud SSL Protected
+          </span>
         </div>
       </div>
 
-      {/* Right Authentication Panel */}
+      {/* ─── RIGHT AUTHENTICATION PANEL ─────────────────────────────────── */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '40px',
+          padding: '36px 40px',
           backgroundColor: 'var(--bg-surface)',
           overflowY: 'auto',
         }}
+        className="form-panel"
       >
-        <div style={{ width: '100%', maxWidth: 440 }}>
+        <div style={{ width: '100%', maxWidth: 520 }}>
           {/* Navigation Tabs (Only in Login or Sign Up mode) */}
           {mode !== 'admin-otp' && (
             <div
@@ -396,7 +563,7 @@ export default function LoginPage() {
                 background: 'var(--bg-muted)',
                 padding: 4,
                 borderRadius: 'var(--radius-lg)',
-                marginBottom: 28,
+                marginBottom: 24,
                 border: '1px solid var(--border)',
               }}
             >
@@ -443,7 +610,9 @@ export default function LoginPage() {
 
           {/* Feedback Alerts */}
           {error && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -458,12 +627,14 @@ export default function LoginPage() {
               }}
             >
               <AlertCircle size={18} style={{ flexShrink: 0 }} />
-              <span>{error}</span>
-            </div>
+              <span style={{ fontWeight: 500 }}>{error}</span>
+            </motion.div>
           )}
 
           {successMessage && (
-            <div
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -479,11 +650,11 @@ export default function LoginPage() {
             >
               <Check size={18} style={{ flexShrink: 0 }} />
               <span>{successMessage}</span>
-            </div>
+            </motion.div>
           )}
 
           <AnimatePresence mode="wait">
-            {/* ─── 1. LOGIN FORM ─────────────────────────────────────────── */}
+            {/* ─── 1. LOGIN FORM WITH ROLE SELECTION ──────────────────────── */}
             {mode === 'login' && (
               <motion.div
                 key="login-form"
@@ -492,16 +663,147 @@ export default function LoginPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.25 }}
               >
-                <div style={{ marginBottom: 24 }}>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    Welcome back
-                  </h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: 4 }}>
-                    Enter your email and password to access your portal.
-                  </p>
+                {/* Role Selection Header */}
+                <div style={{ marginBottom: 18 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+                      Select Institution Portal
+                    </label>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--color-primary-600)', fontWeight: 600 }}>
+                      Active: {currentRole.name}
+                    </span>
+                  </div>
+
+                  {/* 5 Selectable Role Cards */}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(92px, 1fr))',
+                      gap: 8,
+                    }}
+                  >
+                    {PORTAL_ROLES.map((r) => {
+                      const IconComp = r.icon;
+                      const isSelected = selectedRole === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => handleSelectRole(r.id)}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '10px 6px',
+                            borderRadius: 'var(--radius-md)',
+                            border: isSelected ? '2px solid #166534' : '1px solid var(--border)',
+                            backgroundColor: isSelected ? '#f0fdf4' : 'var(--bg-card)',
+                            cursor: 'pointer',
+                            transition: 'all 0.18s ease',
+                            position: 'relative',
+                            boxShadow: isSelected ? '0 2px 8px rgba(22, 101, 52, 0.15)' : 'none',
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: isSelected ? '#166534' : 'var(--bg-muted)',
+                              color: isSelected ? '#ffffff' : 'var(--text-secondary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginBottom: 6,
+                              transition: 'all 0.18s ease',
+                            }}
+                          >
+                            <IconComp size={16} />
+                          </div>
+                          <span
+                            style={{
+                              fontSize: '0.76rem',
+                              fontWeight: isSelected ? 700 : 600,
+                              color: isSelected ? '#166534' : 'var(--text-primary)',
+                              textAlign: 'center',
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {r.shortName}
+                          </span>
+                          {isSelected && (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: 4,
+                                right: 4,
+                                width: 6,
+                                height: 6,
+                                borderRadius: '50%',
+                                backgroundColor: '#16a34a',
+                              }}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {/* Form Heading tailored to selected role */}
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--bg-muted)',
+                    border: '1px solid var(--border)',
+                    marginBottom: 20,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <currentRole.icon size={18} style={{ color: '#166534' }} />
+                      <h2 style={{ fontSize: '1.08rem', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                        {currentRole.name}
+                      </h2>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        backgroundColor: currentRole.bgLight,
+                        color: currentRole.color,
+                      }}
+                    >
+                      {currentRole.badge}
+                    </span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+                    {currentRole.description}
+                  </p>
+                  {selectedRole === 'admin' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        marginTop: 8,
+                        paddingTop: 8,
+                        borderTop: '1px solid var(--border)',
+                        fontSize: '0.74rem',
+                        color: '#065f46',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <ShieldCheck size={14} /> 2FA enforced: 6-digit OTP code will be sent to registered email.
+                    </div>
+                  )}
+                </div>
+
+                <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   <div className="form-group">
                     <label className="form-label" htmlFor="login-email">
                       Email Address
@@ -513,7 +815,7 @@ export default function LoginPage() {
                         type="email"
                         required
                         className="form-input"
-                        placeholder="name@school.edu"
+                        placeholder={`${selectedRole}@edumanage.com`}
                         value={loginEmail}
                         onChange={(e) => setLoginEmail(e.target.value)}
                         style={{ paddingLeft: '38px' }}
@@ -528,7 +830,7 @@ export default function LoginPage() {
                       </label>
                       <button
                         type="button"
-                        onClick={() => alert('Password reset link has been dispatched to your administrator.')}
+                        onClick={() => alert('Password reset request has been logged. Contact your institutional IT administrator.')}
                         style={{
                           background: 'none',
                           border: 'none',
@@ -578,19 +880,19 @@ export default function LoginPage() {
                     type="submit"
                     className="btn btn-primary btn-lg"
                     disabled={loading}
-                    style={{ marginTop: 8, height: 46, fontSize: '0.92rem', fontWeight: 600 }}
+                    style={{ marginTop: 6, height: 46, fontSize: '0.92rem', fontWeight: 600 }}
                   >
                     {loading ? (
                       'Authenticating...'
                     ) : (
                       <>
-                        Sign In <ArrowRight size={17} />
+                        Sign In to {currentRole.shortName} Portal <ArrowRight size={17} />
                       </>
                     )}
                   </button>
                 </form>
 
-                <div style={{ marginTop: 24, textAlign: 'center' }}>
+                <div style={{ marginTop: 22, textAlign: 'center' }}>
                   <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
                     Don't have an account?{' '}
                     <button
@@ -605,14 +907,87 @@ export default function LoginPage() {
                         padding: 0,
                       }}
                     >
-                      Sign Up
+                      Create Account
                     </button>
                   </span>
+                </div>
+
+                {/* Demo Access Card for Admin Demonstration */}
+                <div
+                  style={{
+                    marginTop: 18,
+                    padding: '12px 14px',
+                    backgroundColor: '#f0fdf4',
+                    border: '1px solid #bbf7d0',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.82rem' }}>
+                      <Sparkles size={14} /> Demo Access (Admin Preview)
+                    </div>
+                    <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#15803d' }}>
+                      Populate dedicated demo admin credentials for testing
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedRole('admin');
+                      setLoginEmail('demo@edumanage.com');
+                      setLoginPassword('Demo@EduManage2026');
+                      setError('');
+                      setSuccessMessage('Demo admin credentials filled. Click "Sign In".');
+                    }}
+                    style={{
+                      backgroundColor: '#166534',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '7px 12px',
+                      fontSize: '0.76rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    Load Demo Admin
+                  </button>
+                </div>
+
+                {/* Institution Management Link (Requirement 10) */}
+                <div style={{ marginTop: 16, textAlign: 'center' }}>
+                  <NavLink
+                    to="/institution/manage-accounts"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      color: '#065f46',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      textDecoration: 'none',
+                      padding: '6px 14px',
+                      borderRadius: 'var(--radius-full)',
+                      backgroundColor: 'var(--bg-muted)',
+                      border: '1px solid var(--border)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <Building2 size={13} /> Institution Management · Staff Account Creation →
+                  </NavLink>
                 </div>
               </motion.div>
             )}
 
-            {/* ─── 2. SIGN UP FORM ─────────────────────────────────────────── */}
+            {/* ─── 2. SIGN UP FORM WITH ROLE PERMISSIONS ───────────────────── */}
             {mode === 'signup' && (
               <motion.div
                 key="signup-form"
@@ -621,16 +996,110 @@ export default function LoginPage() {
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.25 }}
               >
-                <div style={{ marginBottom: 24 }}>
-                  <h2 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                    Create an account
+                <div style={{ marginBottom: 20 }}>
+                  <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+                    Create Account
                   </h2>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: 4 }}>
-                    Sign up to join your campus learning network.
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.86rem', margin: 0 }}>
+                    Register for campus portal access.
                   </p>
                 </div>
 
-                <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Account Type Selector */}
+                <div style={{ marginBottom: 18 }}>
+                  <label className="form-label" style={{ marginBottom: 8, display: 'block' }}>
+                    Select Account Role
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => setSignupRole('student')}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 'var(--radius-md)',
+                        border: signupRole === 'student' ? '2px solid #166534' : '1px solid var(--border)',
+                        backgroundColor: signupRole === 'student' ? '#f0fdf4' : 'var(--bg-card)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: 6,
+                          borderRadius: 6,
+                          backgroundColor: signupRole === 'student' ? '#166534' : 'var(--bg-muted)',
+                          color: signupRole === 'student' ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                      >
+                        <GraduationCap size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>Student</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Self-Enrollment</div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSignupRole('parent')}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 'var(--radius-md)',
+                        border: signupRole === 'parent' ? '2px solid #166534' : '1px solid var(--border)',
+                        backgroundColor: signupRole === 'parent' ? '#f0fdf4' : 'var(--bg-card)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        textAlign: 'left',
+                        transition: 'all 0.15s ease',
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: 6,
+                          borderRadius: 6,
+                          backgroundColor: signupRole === 'parent' ? '#166534' : 'var(--bg-muted)',
+                          color: signupRole === 'parent' ? '#ffffff' : 'var(--text-secondary)',
+                        }}
+                      >
+                        <UserCheck size={16} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-primary)' }}>Parent / Guardian</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Family Access</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Institutional Provisioning Notice for Restricted Roles */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      padding: '10px 12px',
+                      backgroundColor: 'var(--bg-muted)',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border)',
+                      marginTop: 10,
+                      fontSize: '0.75rem',
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <Info size={15} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      <strong>Institutional Notice:</strong> Faculty, Librarian, and Administrator accounts must be created by institution management.
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSignupSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div className="form-group">
                     <label className="form-label" htmlFor="signup-name">
                       Full Name
@@ -661,7 +1130,7 @@ export default function LoginPage() {
                         type="email"
                         required
                         className="form-input"
-                        placeholder="john.doe@school.edu"
+                        placeholder="name@school.edu"
                         value={signupEmail}
                         onChange={(e) => setSignupEmail(e.target.value)}
                         style={{ paddingLeft: '38px' }}
@@ -745,19 +1214,19 @@ export default function LoginPage() {
                     type="submit"
                     className="btn btn-primary btn-lg"
                     disabled={loading}
-                    style={{ marginTop: 8, height: 46, fontSize: '0.92rem', fontWeight: 600 }}
+                    style={{ marginTop: 6, height: 46, fontSize: '0.92rem', fontWeight: 600 }}
                   >
                     {loading ? (
                       'Creating Account...'
                     ) : (
                       <>
-                        Create Account <ArrowRight size={17} />
+                        Create {signupRole === 'student' ? 'Student' : 'Parent'} Account <ArrowRight size={17} />
                       </>
                     )}
                   </button>
                 </form>
 
-                <div style={{ marginTop: 24, textAlign: 'center' }}>
+                <div style={{ marginTop: 22, textAlign: 'center' }}>
                   <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
                     Already have an account?{' '}
                     <button
@@ -825,7 +1294,7 @@ export default function LoginPage() {
                     <KeyRound size={22} />
                   </div>
 
-                  <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  <h2 style={{ fontSize: '1.65rem', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
                     Admin 2FA Verification
                   </h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: 4, lineHeight: 1.5 }}>
@@ -835,6 +1304,49 @@ export default function LoginPage() {
                 </div>
 
                 <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                  {/* Demo OTP Assistant when demo account is logging in */}
+                  {loginEmail.toLowerCase() === 'demo@edumanage.com' && (
+                    <div
+                      style={{
+                        padding: '12px 14px',
+                        backgroundColor: '#f0fdf4',
+                        border: '1px solid #86efac',
+                        borderRadius: 'var(--radius-md)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700, fontSize: '0.82rem' }}>
+                          <Sparkles size={14} /> Demo Reviewer OTP Assistant
+                        </div>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.72rem', color: '#14532d' }}>
+                          Auto-populate the 6-digit verification code generated by the server
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleFetchDemoOtp}
+                        disabled={fetchingDemoOtp}
+                        style={{
+                          backgroundColor: '#166534',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: 6,
+                          padding: '6px 12px',
+                          fontSize: '0.76rem',
+                          fontWeight: 700,
+                          cursor: fetchingDemoOtp ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {fetchingDemoOtp ? 'Fetching...' : 'Auto-fill Demo OTP'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* 6 Digit Inputs */}
                   <div style={{ display: 'flex', gap: 8, justifyContent: 'space-between' }}>
                     {otpDigits.map((digit, idx) => (

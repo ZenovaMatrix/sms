@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const pool = require("../../config/db");
 const userRepository = require("./user.repository");
 const auditRepo = require("../audit/audit.repository");
+const { sendAccountActivationEmail } = require("../../utils/email.service");
 const {
   validatePaginationParams,
   validateRole,
@@ -134,6 +135,18 @@ async function createUser(body) {
     status: payload.status,
   });
 
+  // Dispatch account activation and welcome email
+  try {
+    await sendAccountActivationEmail({
+      to: newUser.email,
+      name: newUser.name,
+      role: newUser.role,
+      password: payload.password,
+    });
+  } catch (emailErr) {
+    console.warn("[UserCreation] Activation email delivery notice:", emailErr.message);
+  }
+
   return newUser;
 }
 
@@ -184,6 +197,55 @@ async function updateUserRole(id, body, requester) {
   return updatedUser;
 }
 
+async function resendInvitation(id) {
+  if (!id || typeof id !== "string") {
+    const error = new Error("User ID is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanId = id.trim();
+  const user = await userRepository.findUserById(cleanId);
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  await sendAccountActivationEmail({
+    to: user.email,
+    name: user.name,
+    role: user.role,
+    password: null,
+    isResend: true,
+  });
+
+  return {
+    success: true,
+    message: `Account activation reminder dispatched to ${user.email}`,
+  };
+}
+
+async function toggleUserStatus(id) {
+  if (!id || typeof id !== "string") {
+    const error = new Error("User ID is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const cleanId = id.trim();
+  const user = await userRepository.findUserById(cleanId);
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const newStatus = user.status === "active" ? "inactive" : "active";
+  const updatedUser = await userRepository.updateUser(cleanId, { status: newStatus });
+  return updatedUser;
+}
+
 module.exports = {
   getUsers,
   getUserById,
@@ -191,4 +253,6 @@ module.exports = {
   updateUser,
   updateUserRole,
   createUser,
+  resendInvitation,
+  toggleUserStatus,
 };

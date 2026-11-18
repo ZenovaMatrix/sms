@@ -20,6 +20,7 @@ import ResultsPage from './pages/ResultsPage';
 import FeesPage from './pages/FeesPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
+import InstitutionManagementPage from './pages/InstitutionManagementPage';
 
 import './App.css';
 
@@ -31,6 +32,7 @@ export default function App() {
           <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/institution/manage-accounts" element={<InstitutionManagementPage />} />
             
             <Route element={<PrivateRoute />}>
               <Route path="/" element={<Layout><DashboardPage /></Layout>} />

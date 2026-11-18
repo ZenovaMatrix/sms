@@ -15,7 +15,7 @@ function validateLoginPayload(body) {
     throw error;
   }
 
-  const { email, password } = body;
+  const { email, password, selectedRole } = body;
 
   if (email === undefined || email === null || (typeof email === "string" && email.trim() === "")) {
     const error = new Error("Email is required.");
@@ -49,9 +49,26 @@ function validateLoginPayload(body) {
     throw error;
   }
 
+  let cleanRole = null;
+  if (selectedRole !== undefined && selectedRole !== null && selectedRole !== "") {
+    if (typeof selectedRole !== "string") {
+      const error = new Error("selectedRole must be a string.");
+      error.statusCode = 400;
+      throw error;
+    }
+    cleanRole = selectedRole.trim().toLowerCase();
+    const validRoles = ["admin", "teacher", "faculty", "student", "parent", "librarian"];
+    if (!validRoles.includes(cleanRole)) {
+      const error = new Error(`Invalid role selection. Valid roles are: Admin, Faculty, Student, Parent, Librarian.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   return {
     email: cleanEmail,
     password,
+    selectedRole: cleanRole,
   };
 }
 
@@ -109,7 +126,7 @@ function validateRegisterPayload(body) {
     throw error;
   }
 
-  const { name, email, password } = body;
+  const { name, email, password, role } = body;
 
   if (!name || typeof name !== "string" || name.trim() === "") {
     const error = new Error("Full Name is required.");
@@ -148,10 +165,32 @@ function validateRegisterPayload(body) {
     throw error;
   }
 
+  let requestedRole = "student";
+  if (role !== undefined && role !== null && role !== "") {
+    if (typeof role !== "string") {
+      const error = new Error("Role must be a string.");
+      error.statusCode = 400;
+      throw error;
+    }
+    const cleanRequestedRole = role.trim().toLowerCase();
+    if (["admin", "teacher", "faculty", "librarian"].includes(cleanRequestedRole)) {
+      const error = new Error("Faculty, Librarian, and Administrator accounts must be created by institution management.");
+      error.statusCode = 403;
+      throw error;
+    }
+    if (!["student", "parent"].includes(cleanRequestedRole)) {
+      const error = new Error("Self-registration is only allowed for Student and Parent accounts.");
+      error.statusCode = 400;
+      throw error;
+    }
+    requestedRole = cleanRequestedRole;
+  }
+
   return {
     name: name.trim(),
     email: cleanEmail,
     password,
+    role: requestedRole,
   };
 }
 

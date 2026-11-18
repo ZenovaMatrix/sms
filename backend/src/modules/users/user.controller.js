@@ -92,6 +92,32 @@ async function updateUserRole(req, res, next) {
   }
 }
 
+async function resendInvitation(req, res, next) {
+  try {
+    const result = await userService.resendInvitation(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: result.message,
+      data: result,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+async function toggleUserStatus(req, res, next) {
+  try {
+    const updatedUser = await userService.toggleUserStatus(req.params.id);
+    return res.status(200).json({
+      success: true,
+      message: `User status changed to ${updatedUser.status}`,
+      data: updatedUser,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 /**
  * DELETE /api/v1/users/:id
  * Intentionally disabled to preserve data integrity and foreign keys.
@@ -111,5 +137,7 @@ module.exports = {
   createUser,
   updateUser,
   updateUserRole,
+  resendInvitation,
+  toggleUserStatus,
   deleteUser,
 };

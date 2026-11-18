@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
+  Building2,
 } from 'lucide-react';
 
 const NAV_GROUPS = [
@@ -60,6 +61,7 @@ const NAV_GROUPS = [
   {
     group: 'SYSTEM',
     items: [
+      { path: '/institution/manage-accounts', label: 'Institution Management', icon: Building2 },
       { path: '/settings', label: 'Settings', icon: Settings },
     ],
   },
@@ -70,6 +72,7 @@ const ROLE_PERMISSIONS = {
   teacher: ['Dashboard', 'Students', 'Classes & Sections', 'Subjects', 'Attendance', 'Examinations', 'Results & Grades', 'Announcements'],
   student: ['Dashboard', 'Enrollments', 'Attendance', 'Results & Grades', 'Announcements'],
   parent: ['Dashboard', 'Attendance', 'Results & Grades', 'Fee Management', 'Announcements'],
+  librarian: ['Dashboard', 'Subjects', 'Announcements', 'Settings'],
 };
 
 export default function Sidebar() {
