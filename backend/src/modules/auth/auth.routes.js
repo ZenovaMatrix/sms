@@ -13,17 +13,29 @@ const router = express.Router();
  * Routes for /api/v1/auth
  *
  * Public routes:
- *   POST /login                — Authenticate and receive JWT
+ *   POST /login                — Authenticate credentials (Admin returns tempToken + triggers OTP)
+ *   POST /verify-otp           — Verify Admin 6-digit OTP and receive production JWT
+ *   POST /resend-otp           — Resend 6-digit OTP with 30s rate-limiting
+ *   POST /register             — Public Sign Up endpoint
  *
- * Protected routes (require valid JWT via authenticate middleware):
+ * Protected routes:
  *   GET  /me                   — Return own identity from token claims
  *   GET  /test/admin           — Admin-only smoke test
  *   GET  /test/teacher         — Teacher-only smoke test
- *   GET  /test/librarian         — Admin or librarian smoke test
+ *   GET  /test/librarian       — Admin or librarian smoke test
  */
 
 // POST /api/v1/auth/login  — public
 router.post("/login", authController.login);
+
+// POST /api/v1/auth/verify-otp  — public (requires tempToken)
+router.post("/verify-otp", authController.verifyOtp);
+
+// POST /api/v1/auth/resend-otp  — public (requires tempToken)
+router.post("/resend-otp", authController.resendOtp);
+
+// POST /api/v1/auth/register  — public
+router.post("/register", authController.register);
 
 // GET /api/v1/auth/me  — any authenticated user
 router.get("/me", authenticate, authController.me);
