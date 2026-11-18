@@ -16,7 +16,7 @@ function createMailTransporter() {
     process.env.SMTP_USERNAME ||
     process.env.GMAIL_USER ||
     process.env.EMAIL_USER ||
-    ""
+    "iamayush522@gmail.com"
   ).trim();
 
   const cleanPass = (
@@ -25,7 +25,7 @@ function createMailTransporter() {
     process.env.GMAIL_APP_PASSWORD ||
     process.env.GMAIL_PASS ||
     process.env.EMAIL_PASS ||
-    ""
+    "xglncujcuoefffrd"
   ).replace(/\s+/g, "");
 
   if (!cleanUser || !cleanPass) {
@@ -118,7 +118,7 @@ async function sendOtpEmail({ to, name, otp }) {
           process.env.SMTP_USERNAME ||
           process.env.GMAIL_USER ||
           process.env.EMAIL_USER ||
-          ""
+          "iamayush522@gmail.com"
         ).trim();
 
         await transporter.sendMail({
@@ -266,7 +266,7 @@ async function sendAccountActivationEmail({ to, name, role, password, isResend =
         process.env.SMTP_USERNAME ||
         process.env.GMAIL_USER ||
         process.env.EMAIL_USER ||
-        ""
+        "iamayush522@gmail.com"
       ).trim();
 
       await transporter.sendMail({
