@@ -15,7 +15,9 @@ function validateLoginPayload(body) {
     throw error;
   }
 
-  const { email, password, selectedRole } = body;
+  const email = body.email !== undefined && body.email !== null ? body.email : body.username;
+  const { password } = body;
+  const selectedRole = body.selectedRole !== undefined && body.selectedRole !== null ? body.selectedRole : body.role;
 
   if (email === undefined || email === null || (typeof email === "string" && email.trim() === "")) {
     const error = new Error("Email is required.");

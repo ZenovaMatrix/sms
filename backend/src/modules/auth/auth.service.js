@@ -104,7 +104,8 @@ async function login(payload) {
 
   // 6. ADMIN 2FA OTP REQUIREMENT
   // If the user has role 'admin', issue a temporary token and dispatch an OTP to their email
-  if (user.role === "admin") {
+  const userRole = (user.role || "").toLowerCase();
+  if (userRole === "admin") {
     const otp = generateSecureOtp();
     const otpHash = await bcrypt.hash(otp, 10);
     const otpId = crypto.randomUUID();
@@ -143,7 +144,7 @@ async function login(payload) {
     });
 
     // Mask the email for user privacy display
-    const maskedEmail = user.email.replace(/(?<=.{3}).(?=.*@)/g, "*");
+    const maskedEmail = user.email ? user.email.replace(/(?<=.{3}).(?=.*@)/g, "*") : "registered email";
 
     return {
       requiresOtp: true,

@@ -56,8 +56,10 @@ const SAFE_LINKED_STUDENT_COLUMNS = `
  * @param {{ page: number, limit: number, search: string|null }} params
  * @returns {{ parents: object[], total: number }}
  */
-async function findAllParents({ page, limit, search, class_id, section_id, student_id }) {
-  const offset = (page - 1) * limit;
+async function findAllParents({ page = 1, limit = 10, search, class_id, section_id, student_id } = {}) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 10));
+  const offset = (safePage - 1) * safeLimit;
   const whereClauses = [];
   const queryParams = [];
 
@@ -100,11 +102,10 @@ async function findAllParents({ page, limit, search, class_id, section_id, stude
     LEFT JOIN users u ON p.user_id = u.id
     ${whereSql}
     ORDER BY p.created_at DESC
-    LIMIT ? OFFSET ?
+    LIMIT ${safeLimit} OFFSET ${offset}
   `;
 
-  const dataParams = [...queryParams, Number(limit), Number(offset)];
-  const [parents] = await pool.execute(dataSql, dataParams);
+  const [parents] = await pool.execute(dataSql, queryParams);
 
   return { parents, total };
 }

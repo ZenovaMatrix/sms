@@ -64,8 +64,10 @@ const SAFE_USER_JOIN_COLUMNS = `
  * @param {{ page: number, limit: number, search: string|null }} params
  * @returns {{ students: object[], total: number }}
  */
-async function findAllStudents({ page, limit, search }) {
-  const offset = (page - 1) * limit;
+async function findAllStudents({ page = 1, limit = 10, search } = {}) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 10));
+  const offset = (safePage - 1) * safeLimit;
   const whereClauses = [];
   const queryParams = [];
 
@@ -91,7 +93,7 @@ async function findAllStudents({ page, limit, search }) {
   const [countRows] = await pool.execute(countSql, queryParams);
   const total = Number(countRows[0].total);
 
-  // Fetch paginated rows
+  // Fetch paginated rows - safe integers directly in LIMIT/OFFSET for TiDB/MySQL protocol compatibility
   const dataSql = `
     SELECT
       ${SAFE_STUDENT_COLUMNS},
@@ -100,11 +102,10 @@ async function findAllStudents({ page, limit, search }) {
     LEFT JOIN users u ON s.user_id = u.id
     ${whereSql}
     ORDER BY s.created_at DESC
-    LIMIT ? OFFSET ?
+    LIMIT ${safeLimit} OFFSET ${offset}
   `;
 
-  const dataParams = [...queryParams, Number(limit), Number(offset)];
-  const [students] = await pool.execute(dataSql, dataParams);
+  const [students] = await pool.execute(dataSql, queryParams);
 
   return { students, total };
 }

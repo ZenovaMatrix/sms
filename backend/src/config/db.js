@@ -18,8 +18,13 @@ const poolConfig = {
   password: config.db.password,
   database: config.db.name,
   connectionLimit: 10,
+  maxIdle: 5,
+  idleTimeout: 60000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   waitForConnections: true,
   queueLimit: 0,
+  timezone: "Z",
 };
 
 if (config.db.ssl) {

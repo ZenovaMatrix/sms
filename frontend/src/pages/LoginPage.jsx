@@ -792,6 +792,7 @@ export default function LoginPage() {
                         id="login-email"
                         type="email"
                         required
+                        autoComplete="username"
                         className="form-input"
                         placeholder={`${selectedRole}@edumanage.com`}
                         value={loginEmail}
@@ -828,6 +829,7 @@ export default function LoginPage() {
                         id="login-password"
                         type={showLoginPassword ? 'text' : 'password'}
                         required
+                        autoComplete="current-password"
                         className="form-input"
                         placeholder="••••••••"
                         value={loginPassword}
@@ -1107,6 +1109,7 @@ export default function LoginPage() {
                         id="signup-email"
                         type="email"
                         required
+                        autoComplete="username"
                         className="form-input"
                         placeholder="name@school.edu"
                         value={signupEmail}
@@ -1126,6 +1129,7 @@ export default function LoginPage() {
                         id="signup-password"
                         type={showSignupPassword ? 'text' : 'password'}
                         required
+                        autoComplete="new-password"
                         className="form-input"
                         placeholder="••••••••"
                         value={signupPassword}
@@ -1162,6 +1166,7 @@ export default function LoginPage() {
                         id="signup-confirm-password"
                         type={showConfirmPassword ? 'text' : 'password'}
                         required
+                        autoComplete="new-password"
                         className="form-input"
                         placeholder="••••••••"
                         value={signupConfirmPassword}

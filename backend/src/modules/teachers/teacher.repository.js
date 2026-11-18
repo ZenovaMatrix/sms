@@ -59,8 +59,10 @@ const SAFE_DEPT_JOIN_COLUMNS = `
  * @param {{ page: number, limit: number, search: string|null }} params
  * @returns {{ teachers: object[], total: number }}
  */
-async function findAllTeachers({ page, limit, search }) {
-  const offset = (page - 1) * limit;
+async function findAllTeachers({ page = 1, limit = 10, search } = {}) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeLimit = Math.max(1, Math.min(200, parseInt(limit, 10) || 10));
+  const offset = (safePage - 1) * safeLimit;
   const whereClauses = [];
   const queryParams = [];
 
@@ -85,7 +87,7 @@ async function findAllTeachers({ page, limit, search }) {
   const [countRows] = await pool.execute(countSql, queryParams);
   const total = Number(countRows[0].total);
 
-  // Fetch paginated rows
+  // Fetch paginated rows - safe integers directly in LIMIT/OFFSET for TiDB/MySQL protocol compatibility
   const dataSql = `
     SELECT
       ${SAFE_TEACHER_COLUMNS},
@@ -96,11 +98,10 @@ async function findAllTeachers({ page, limit, search }) {
     LEFT JOIN departments d ON t.department_id = d.id
     ${whereSql}
     ORDER BY t.created_at DESC
-    LIMIT ? OFFSET ?
+    LIMIT ${safeLimit} OFFSET ${offset}
   `;
 
-  const dataParams = [...queryParams, Number(limit), Number(offset)];
-  const [teachers] = await pool.execute(dataSql, dataParams);
+  const [teachers] = await pool.execute(dataSql, queryParams);
 
   return { teachers, total };
 }
