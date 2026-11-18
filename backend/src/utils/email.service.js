@@ -15,17 +15,19 @@ function createMailTransporter() {
     return null;
   }
 
+  const cleanUser = process.env.SMTP_USER.trim();
+  const cleanPass = process.env.SMTP_PASS.replace(/\s+/g, "");
+
   const nodemailer = require("nodemailer");
   const host = (process.env.SMTP_HOST || "smtp.gmail.com").toLowerCase();
-  const user = (process.env.SMTP_USER || "").toLowerCase();
-  const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
+  const isGmail = host.includes("gmail") || cleanUser.toLowerCase().endsWith("@gmail.com");
 
   if (isGmail) {
     return nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: cleanUser,
+        pass: cleanPass,
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
@@ -37,8 +39,8 @@ function createMailTransporter() {
     port: parseInt(process.env.SMTP_PORT, 10) || 587,
     secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: cleanUser,
+      pass: cleanPass,
     },
     tls: {
       rejectUnauthorized: false,
