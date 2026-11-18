@@ -6,12 +6,47 @@
  * Production-grade OTP email delivery for EduManage.
  *
  * Priority:
- *   1. Gmail / SMTP (if SMTP_HOST + SMTP_USER + SMTP_PASS configured)
- *   2. Console log fallback (always, so OTP is visible in Vercel function logs)
- *
- * In Vercel production: OTP is always written to function log stream so the
- * admin can retrieve it from the Vercel dashboard → Functions → Logs.
+ *   1. Gmail / SMTP (if SMTP_USER + SMTP_PASS configured)
+ *   2. Server function logs (fallback when SMTP is not configured)
  */
+
+function createMailTransporter() {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    return null;
+  }
+
+  const nodemailer = require("nodemailer");
+  const host = (process.env.SMTP_HOST || "smtp.gmail.com").toLowerCase();
+  const user = (process.env.SMTP_USER || "").toLowerCase();
+  const isGmail = host.includes("gmail") || user.endsWith("@gmail.com");
+
+  if (isGmail) {
+    return nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+    });
+  }
+
+  return nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: parseInt(process.env.SMTP_PORT, 10) || 587,
+    secure: process.env.SMTP_SECURE === "true" || process.env.SMTP_PORT === "465",
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+  });
+}
 
 async function sendOtpEmail({ to, name, otp }) {
   try {
@@ -54,23 +89,11 @@ async function sendOtpEmail({ to, name, otp }) {
 
     // --- Attempt SMTP delivery ---
     let smtpSent = false;
-    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+    let failureReason = null;
+    const transporter = createMailTransporter();
+
+    if (transporter) {
       try {
-        const nodemailer = require("nodemailer");
-
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST,
-          port: parseInt(process.env.SMTP_PORT, 10) || 587,
-          secure: process.env.SMTP_SECURE === "true",
-          auth: {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          },
-          tls: {
-            rejectUnauthorized: false,
-          },
-        });
-
         await transporter.sendMail({
           from: process.env.SMTP_FROM || `"EduManage Security" <${process.env.SMTP_USER}>`,
           to,
@@ -82,11 +105,15 @@ async function sendOtpEmail({ to, name, otp }) {
         smtpSent = true;
         console.log(`[EmailService] ✓ OTP email delivered via SMTP to: ${to.replace(/(?<=.{3}).(?=.*@)/g, "*")}`);
       } catch (err) {
+        failureReason = err.message;
         console.warn(`[EmailService] SMTP delivery failed: ${err.message}`);
       }
+    } else {
+      failureReason = "SMTP_USER and SMTP_PASS are not configured in environment variables.";
+      console.warn(`[EmailService] Notice: ${failureReason}`);
     }
 
-    // --- Always log OTP to server/function logs (for Vercel log access) ---
+    // --- Log OTP to server/function logs ---
     if (!smtpSent) {
       if (process.env.NODE_ENV !== "production") {
         console.log("╔════════════════════════════════════════╗");
@@ -101,10 +128,15 @@ async function sendOtpEmail({ to, name, otp }) {
       }
     }
 
-    return { sent: smtpSent, method: smtpSent ? "smtp" : "log" };
+    return {
+      sent: smtpSent,
+      configured: !!transporter,
+      reason: failureReason,
+      method: smtpSent ? "smtp" : "log",
+    };
   } catch (err) {
     console.warn("[EmailService] Top-level sendOtpEmail notice:", err.message);
-    return { sent: false, method: "fallback" };
+    return { sent: false, configured: false, reason: err.message, method: "fallback" };
   }
 }
 
@@ -199,20 +231,9 @@ async function sendAccountActivationEmail({ to, name, role, password, isResend =
   `;
 
   let smtpSent = false;
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+  const transporter = createMailTransporter();
+  if (transporter) {
     try {
-      const nodemailer = require("nodemailer");
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT, 10) || 587,
-        secure: process.env.SMTP_SECURE === "true",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: { rejectUnauthorized: false },
-      });
-
       await transporter.sendMail({
         from: process.env.SMTP_FROM || `"EduManage Institution Management" <${process.env.SMTP_USER}>`,
         to,

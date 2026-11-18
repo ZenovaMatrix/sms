@@ -120,8 +120,9 @@ async function login(payload) {
     });
 
     // Send the OTP via email service (safely wrapped so email delivery failures do not block login)
+    let emailStatus = { sent: false, configured: false };
     try {
-      await sendOtpEmail({
+      emailStatus = await sendOtpEmail({
         to: user.email,
         name: user.name,
         otp,
@@ -145,12 +146,20 @@ async function login(payload) {
 
     // Mask the email for user privacy display
     const maskedEmail = user.email ? user.email.replace(/(?<=.{3}).(?=.*@)/g, "*") : "registered email";
+    const isDemoAdmin = user.email.toLowerCase() === DEMO_ADMIN_EMAIL;
+
+    const message = emailStatus.sent
+      ? `A 6-digit verification code has been dispatched to ${maskedEmail}.`
+      : `Verification code generated. (Notice: Live email delivery requires SMTP_USER & SMTP_PASS in Vercel)`;
 
     return {
       requiresOtp: true,
       tempToken,
       email: maskedEmail,
-      message: `A 6-digit verification code has been dispatched to ${maskedEmail}.`,
+      emailSent: emailStatus.sent,
+      smtpConfigured: emailStatus.configured,
+      message,
+      demoOtp: isDemoAdmin ? otp : undefined,
     };
   }
 
@@ -312,8 +321,9 @@ async function resendAdminOtp(payload) {
     expiresAt,
   });
 
+  let emailStatus = { sent: false, configured: false };
   try {
-    await sendOtpEmail({
+    emailStatus = await sendOtpEmail({
       to: user.email,
       name: user.name,
       otp,
@@ -335,12 +345,20 @@ async function resendAdminOtp(payload) {
     type: "admin_otp_session",
   });
 
-  const maskedEmail = user.email.replace(/(?<=.{3}).(?=.*@)/g, "*");
+  const maskedEmail = user.email ? user.email.replace(/(?<=.{3}).(?=.*@)/g, "*") : "registered email";
+  const isDemoAdmin = user.email.toLowerCase() === DEMO_ADMIN_EMAIL;
+
+  const message = emailStatus.sent
+    ? `A fresh verification code has been dispatched to ${maskedEmail}.`
+    : `A new code has been generated. (Notice: Live email delivery requires SMTP_USER & SMTP_PASS in Vercel)`;
 
   return {
     success: true,
     tempToken: newTempToken,
-    message: `A new verification code has been dispatched to ${maskedEmail}.`,
+    emailSent: emailStatus.sent,
+    smtpConfigured: emailStatus.configured,
+    message,
+    demoOtp: isDemoAdmin ? otp : undefined,
   };
 }
 

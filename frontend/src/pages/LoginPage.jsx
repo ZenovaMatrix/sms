@@ -108,6 +108,8 @@ export default function LoginPage() {
   // Admin OTP state
   const [adminTempToken, setAdminTempToken] = useState('');
   const [adminMaskedEmail, setAdminMaskedEmail] = useState('');
+  const [emailDispatched, setEmailDispatched] = useState(true);
+  const [demoOtpValue, setDemoOtpValue] = useState('');
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
   const [otpCountdown, setOtpCountdown] = useState(300); // 5 minutes in seconds
   const [canResend, setCanResend] = useState(false);
@@ -177,6 +179,8 @@ export default function LoginPage() {
           // Admin OTP 2FA required
           setAdminTempToken(data.data.tempToken);
           setAdminMaskedEmail(data.data.email);
+          setEmailDispatched(data.data.emailSent ?? true);
+          setDemoOtpValue(data.data.demoOtp || '');
           setOtpDigits(['', '', '', '', '', '']);
           setOtpCountdown(300);
           setCanResend(false);
@@ -247,6 +251,8 @@ export default function LoginPage() {
         setOtpCountdown(300);
         setCanResend(false);
         setOtpDigits(['', '', '', '', '', '']);
+        setEmailDispatched(data.data.emailSent ?? true);
+        setDemoOtpValue(data.data.demoOtp || '');
         setSuccessMessage(data.data.message || 'A fresh verification code has been dispatched.');
         if (otpInputRefs.current[0]) otpInputRefs.current[0].focus();
       }
@@ -1284,6 +1290,25 @@ export default function LoginPage() {
                     For institutional security, enter the 6-digit verification code sent to{' '}
                     <strong style={{ color: 'var(--text-primary)' }}>{adminMaskedEmail}</strong>.
                   </p>
+                  {/* Show notice if email was NOT dispatched (SMTP not configured) */}
+                  {!emailDispatched && (
+                    <div style={{
+                      marginTop: 10,
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#fffbeb',
+                      border: '1px solid #fcd34d',
+                      fontSize: '0.78rem',
+                      color: '#92400e',
+                      lineHeight: 1.5,
+                    }}>
+                      <strong>⚠ Email Delivery Notice:</strong> SMTP is not configured — the OTP was not sent to your inbox.
+                      {demoOtpValue
+                        ? <> Your <strong>Demo OTP is: <span style={{ fontFamily: 'monospace', letterSpacing: 2, color: '#166534', fontSize: '1rem' }}>{demoOtpValue}</span></strong></>
+                        : <> Please check your <strong>Vercel Function Logs</strong> (Dashboard → Functions → Logs) for the OTP code.</>
+                      }
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
