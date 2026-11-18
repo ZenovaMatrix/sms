@@ -14,98 +14,98 @@
  */
 
 async function sendOtpEmail({ to, name, otp }) {
-  const subject = "EduManage Admin Verification Code";
+  try {
+    const subject = "EduManage Admin Verification Code";
 
-  const bodyText = [
-    `Hello ${name || "Administrator"},`,
-    ``,
-    `Your 6-digit verification code is: ${otp}`,
-    ``,
-    `This code expires in 5 minutes.`,
-    `If you did not request this, secure your account immediately.`,
-    ``,
-    `EduManage Security Team`,
-  ].join("\n");
+    const bodyText = [
+      `Hello ${name || "Administrator"},`,
+      ``,
+      `Your 6-digit verification code is: ${otp}`,
+      ``,
+      `This code expires in 5 minutes.`,
+      `If you did not request this, secure your account immediately.`,
+      ``,
+      `EduManage Security Team`,
+    ].join("\n");
 
-  const bodyHtml = `
-    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:8px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
-        <div style="width:36px;height:36px;border-radius:8px;background:#166534;display:flex;align-items:center;justify-content:center;">
-          <span style="color:#fff;font-size:20px;font-weight:800;">E</span>
+    const bodyHtml = `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:8px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+          <div style="width:36px;height:36px;border-radius:8px;background:#166534;display:flex;align-items:center;justify-content:center;">
+            <span style="color:#fff;font-size:20px;font-weight:800;">E</span>
+          </div>
+          <span style="font-size:1.1rem;font-weight:800;color:#166534;">EduManage Admin Security</span>
         </div>
-        <span style="font-size:1.1rem;font-weight:800;color:#166534;">EduManage Admin Security</span>
+        <p style="color:#334155;font-size:15px;">Hello <strong>${name || "Administrator"}</strong>,</p>
+        <p style="color:#334155;font-size:15px;">Complete your admin login with the verification code below:</p>
+        <div style="background:#f0fdf4;border:1.5px dashed #16a34a;border-radius:8px;padding:22px;text-align:center;margin:24px 0;">
+          <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#166534;font-family:monospace;">${otp}</span>
+        </div>
+        <p style="color:#64748b;font-size:13px;">
+          ⏱ This code expires in <strong>5 minutes</strong>.<br/>
+          🔒 Never share this code. EduManage staff will never ask for it.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;"/>
+        <p style="color:#94a3b8;font-size:12px;margin:0;">
+          © ${new Date().getFullYear()} EduManage Technologies Inc. · Automated security message.
+        </p>
       </div>
-      <p style="color:#334155;font-size:15px;">Hello <strong>${name || "Administrator"}</strong>,</p>
-      <p style="color:#334155;font-size:15px;">Complete your admin login with the verification code below:</p>
-      <div style="background:#f0fdf4;border:1.5px dashed #16a34a;border-radius:8px;padding:22px;text-align:center;margin:24px 0;">
-        <span style="font-size:36px;font-weight:800;letter-spacing:8px;color:#166534;font-family:monospace;">${otp}</span>
-      </div>
-      <p style="color:#64748b;font-size:13px;">
-        ⏱ This code expires in <strong>5 minutes</strong>.<br/>
-        🔒 Never share this code. EduManage staff will never ask for it.
-      </p>
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;"/>
-      <p style="color:#94a3b8;font-size:12px;margin:0;">
-        © ${new Date().getFullYear()} EduManage Technologies Inc. · Automated security message.
-      </p>
-    </div>
-  `;
+    `;
 
-  // --- Attempt SMTP delivery ---
-  let smtpSent = false;
-  if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
-    try {
-      const nodemailer = require("nodemailer");
+    // --- Attempt SMTP delivery ---
+    let smtpSent = false;
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      try {
+        const nodemailer = require("nodemailer");
 
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT, 10) || 587,
-        secure: process.env.SMTP_SECURE === "true",
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-        tls: {
-          rejectUnauthorized: false, // Allow self-signed certs for Gmail relay
-        },
-      });
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT, 10) || 587,
+          secure: process.env.SMTP_SECURE === "true",
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          },
+          tls: {
+            rejectUnauthorized: false,
+          },
+        });
 
-      await transporter.sendMail({
-        from: process.env.SMTP_FROM || `"EduManage Security" <${process.env.SMTP_USER}>`,
-        to,
-        subject,
-        text: bodyText,
-        html: bodyHtml,
-      });
+        await transporter.sendMail({
+          from: process.env.SMTP_FROM || `"EduManage Security" <${process.env.SMTP_USER}>`,
+          to,
+          subject,
+          text: bodyText,
+          html: bodyHtml,
+        });
 
-      smtpSent = true;
-      console.log(`[EmailService] ✓ OTP email delivered via SMTP to: ${to.replace(/(?<=.{3}).(?=.*@)/g, "*")}`);
-    } catch (err) {
-      console.warn(`[EmailService] SMTP delivery failed: ${err.message}`);
+        smtpSent = true;
+        console.log(`[EmailService] ✓ OTP email delivered via SMTP to: ${to.replace(/(?<=.{3}).(?=.*@)/g, "*")}`);
+      } catch (err) {
+        console.warn(`[EmailService] SMTP delivery failed: ${err.message}`);
+      }
     }
-  }
 
-  // --- Always log OTP to server/function logs (for Vercel log access) ---
-  // In production: masked address is logged, NOT the OTP (security)
-  // In development: full OTP shown for local testing
-  if (!smtpSent) {
-    if (process.env.NODE_ENV !== "production") {
-      // Local development: show OTP in console
-      console.log("╔════════════════════════════════════════╗");
-      console.log("║   [DEV] ADMIN OTP CODE (not emailed)   ║");
-      console.log(`║   To:  ${to.padEnd(32)} ║`);
-      console.log(`║   OTP: ${otp}                            ║`);
-      console.log("║   Expires: 5 minutes                   ║");
-      console.log("╚════════════════════════════════════════╝");
-    } else {
-      // Production (Vercel): Write OTP to function log stream
-      // Admin can retrieve from Vercel Dashboard → Project → Functions → Logs
-      console.log("[EmailService][PRODUCTION] OTP generated for:", to.replace(/(?<=.{3}).(?=.*@)/g, "*"));
-      console.log("[EmailService][OTP_DELIVERY] Code:", otp, "| Recipient:", to, "| Expires: 5min");
+    // --- Always log OTP to server/function logs (for Vercel log access) ---
+    if (!smtpSent) {
+      if (process.env.NODE_ENV !== "production") {
+        console.log("╔════════════════════════════════════════╗");
+        console.log("║   [DEV] ADMIN OTP CODE (not emailed)   ║");
+        console.log(`║   To:  ${to.padEnd(32)} ║`);
+        console.log(`║   OTP: ${otp}                            ║`);
+        console.log("║   Expires: 5 minutes                   ║");
+        console.log("╚════════════════════════════════════════╝");
+      } else {
+        console.log("[EmailService][PRODUCTION] OTP generated for:", to.replace(/(?<=.{3}).(?=.*@)/g, "*"));
+        console.log("[EmailService][OTP_DELIVERY] Code:", otp, "| Recipient:", to, "| Expires: 5min");
+      }
     }
-  }
 
-  return { sent: smtpSent, method: smtpSent ? "smtp" : "log" };
+    return { sent: smtpSent, method: smtpSent ? "smtp" : "log" };
+  } catch (err) {
+    console.warn("[EmailService] Top-level sendOtpEmail notice:", err.message);
+    return { sent: false, method: "fallback" };
+  }
 }
 
 async function sendAccountActivationEmail({ to, name, role, password, isResend = false }) {

@@ -68,9 +68,22 @@ app.use((req, res, next) => {
 app.use(express.json());
 
 // API v1 Routes
-app.use("/api/v1/health", healthRoutes);
-app.use("/api/v1/users", userRoutes);
-app.use("/api/v1/auth", authRoutes);
+const authController = require("./modules/auth/auth.controller");
+
+app.use(["/api/v1/health", "/v1/health", "/api/health", "/health"], healthRoutes);
+app.use(["/api/v1/users", "/v1/users", "/api/users", "/users"], userRoutes);
+app.use(["/api/v1/auth", "/v1/auth", "/api/auth", "/auth"], authRoutes);
+
+// Direct aliases for OTP verification to prevent any route mismatches
+app.post(
+  ["/api/v1/verify-otp", "/v1/verify-otp", "/api/verify-otp", "/verify-otp"],
+  authController.verifyOtp
+);
+app.post(
+  ["/api/v1/auth/verify-otp", "/api/v1/auth/verify_otp", "/api/v1/auth/verify", "/api/v1/auth/otp/verify"],
+  authController.verifyOtp
+);
+
 app.use("/api/v1/students", studentRoutes);
 app.use("/api/v1/teachers", teacherRoutes);
 app.use("/api/v1/parents", parentRoutes);

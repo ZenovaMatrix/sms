@@ -118,16 +118,19 @@ async function login(payload) {
       expiresAt,
     });
 
-    // Send the OTP via email service
-    await sendOtpEmail({
-      to: user.email,
-      name: user.name,
-      otp,
-    });
+    // Send the OTP via email service (safely wrapped so email delivery failures do not block login)
+    try {
+      await sendOtpEmail({
+        to: user.email,
+        name: user.name,
+        otp,
+      });
+    } catch (emailErr) {
+      console.warn("[AuthService] OTP email dispatch warning:", emailErr.message);
+    }
 
-    // For the demo admin account: cache the plaintext OTP so the
-    // /auth/demo-otp-peek endpoint can surface it for demonstrations.
-    if (user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
+    // In development mode, cache demo OTP for developer inspection
+    if (process.env.NODE_ENV !== "production" && user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
       otpCache.set(user.id, otp);
     }
 
@@ -308,14 +311,18 @@ async function resendAdminOtp(payload) {
     expiresAt,
   });
 
-  await sendOtpEmail({
-    to: user.email,
-    name: user.name,
-    otp,
-  });
+  try {
+    await sendOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+    });
+  } catch (emailErr) {
+    console.warn("[AuthService] Resend OTP email dispatch warning:", emailErr.message);
+  }
 
-  // Update demo cache on resend
-  if (user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
+  // Update demo cache on resend in development mode
+  if (process.env.NODE_ENV !== "production" && user.email.toLowerCase() === DEMO_ADMIN_EMAIL) {
     otpCache.set(user.id, otp);
   }
 

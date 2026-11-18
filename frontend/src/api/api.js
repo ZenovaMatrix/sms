@@ -16,11 +16,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Global 401 handler – redirect to login
+// Global 401 handler – redirect to login for protected routes only
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthRoute = error.config?.url?.includes('/auth/');
+    if (error.response?.status === 401 && !isAuthRoute) {
       localStorage.removeItem('edu_token');
       localStorage.removeItem('edu_user');
       window.location.href = '/login';

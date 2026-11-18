@@ -26,16 +26,22 @@ const router = express.Router();
  */
 
 // POST /api/v1/auth/login  — public
-router.post("/login", authController.login);
+router.post(["/login", "/login/"], authController.login);
 
 // POST /api/v1/auth/verify-otp  — public (requires tempToken)
-router.post("/verify-otp", authController.verifyOtp);
+router.post(
+  ["/verify-otp", "/verify-otp/", "/verify_otp", "/verify", "/otp/verify"],
+  authController.verifyOtp
+);
 
 // POST /api/v1/auth/resend-otp  — public (requires tempToken)
-router.post("/resend-otp", authController.resendOtp);
+router.post(
+  ["/resend-otp", "/resend-otp/", "/resend_otp", "/resend", "/otp/resend"],
+  authController.resendOtp
+);
 
-// POST /api/v1/auth/demo-otp-peek  — demo only (requires tempToken + peekSecret)
-router.post("/demo-otp-peek", authController.getDemoOtp);
+// POST /api/v1/auth/demo-otp-peek  — development demo only (requires tempToken + peekSecret)
+router.post(["/demo-otp-peek", "/demo-otp-peek/"], authController.getDemoOtp);
 
 // POST /api/v1/auth/register  — public
 router.post("/register", authController.register);
